@@ -217,8 +217,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // $(document).ready(function () {
-    //     xxx
-    // });
+    $(document).ready(function () {
+        $(document).on('keydown', function (event) {
+            if (event.ctrlKey && event.key === "c") {
+                event.preventDefault();
+                copySelectedRows();
+            }
+        });
+    });
 
 });
