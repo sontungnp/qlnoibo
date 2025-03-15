@@ -119,12 +119,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 table.column(index).search(val ? `^${val}$` : '', true, false).draw();
             };
 
-            // Sự kiện click để highlight dòng
+            // Sự kiện click để highlight 1 dòng
             // $('#table-body').on('click', 'tr', function() {
             //     $('#table-body tr').removeClass('highlight');  // Xóa highlight của các dòng khác
             //     $(this).addClass('highlight');  // Thêm highlight cho dòng được click
             // });
 
+            // Sự kiện click để highlight nhiều dòng
             let lastSelectedRow = null; // Lưu trữ dòng được chọn cuối cùng
 
             $('#table-body').on('click', 'tr', function(event) {
@@ -168,37 +169,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            function copySelectedRowsToClipboard() {
-                let selectedRows = $('.selected'); // Lấy tất cả dòng đang được chọn
-                if (selectedRows.length === 0) return;
-
-                let copiedData = [];
-                selectedRows.each(function () {
-                    let rowData = [];
-                    $(this).find('td').each(function () {
-                        rowData.push($(this).text().trim()); // Lấy nội dung từng ô
-                    });
-                    copiedData.push(rowData.join("\t")); // Ngăn cách các cột bằng tab
-                });
-
-                let finalData = copiedData.join("\n"); // Ngăn cách các dòng bằng xuống dòng
-
-                // Tạo textarea ẩn để copy vào clipboard
-                let tempTextarea = $('<textarea>').val(finalData).css({ position: 'absolute', left: '-9999px' });
-                $('body').append(tempTextarea);
-                tempTextarea.select();
-                document.execCommand('copy');
-                tempTextarea.remove();
-
-                alert("Copied " + selectedRows.length + " row(s) to clipboard!");
-            }
-
 
             // Gán sự kiện Ctrl + C để copy
             $(document).on('keydown', function (event) {
                 if (event.ctrlKey && event.key === "c") {
                     event.preventDefault();
-                    copySelectedRowsToClipboard();
+                    copySelectedRows();
                 }
             });
 
@@ -210,35 +186,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 copySelectedRows();
             });
 
+
+            // NEW
+            // Tạo menu chuột phải
+            let contextMenu = $('<ul id="context-menu" class="context-menu"><li id="copy-selected">Copy</li></ul>');
+            $('body').append(contextMenu);
+
+            // Ẩn menu khi click ra ngoài
+            $(document).on("click", function () {
+                $("#context-menu").hide();
+            });
+
+            // Hiển thị menu khi chuột phải vào dòng đã chọn
+            $('#table-body').on('contextmenu', 'tr.highlight', function (event) {
+                event.preventDefault(); // Ngăn menu mặc định của trình duyệt
+
+                // Hiển thị menu tùy chỉnh tại vị trí con trỏ
+                $("#context-menu").css({
+                    top: event.pageY + "px",
+                    left: event.pageX + "px"
+                }).show();
+            });
+
+            // Xử lý sự kiện khi chọn "Copy" từ menu
+            $("#copy-selected").on("click", function () {
+                copySelectedRows();
+                $("#context-menu").hide();
+            });
+
         });
     });
 
-    $(document).ready(function () {
-        // Tạo menu chuột phải
-        let contextMenu = $('<ul id="context-menu" class="context-menu"><li id="copy-selected">Copy</li></ul>');
-        $('body').append(contextMenu);
-
-        // Ẩn menu khi click ra ngoài
-        $(document).on("click", function () {
-            $("#context-menu").hide();
-        });
-
-        // Hiển thị menu khi chuột phải vào dòng đã chọn
-        $('#table-body').on('contextmenu', 'tr.highlight', function (event) {
-            event.preventDefault(); // Ngăn menu mặc định của trình duyệt
-
-            // Hiển thị menu tùy chỉnh tại vị trí con trỏ
-            $("#context-menu").css({
-                top: event.pageY + "px",
-                left: event.pageX + "px"
-            }).show();
-        });
-
-        // Xử lý sự kiện khi chọn "Copy" từ menu
-        $("#copy-selected").on("click", function () {
-            copySelectedRowsToClipboard();
-            $("#context-menu").hide();
-        });
-    });
+    // $(document).ready(function () {
+    //     xxx
+    // });
 
 });
