@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // Gán sự kiện Ctrl + C để copy
-            $(document).on('keydown', function (event) {
+            $(document).on('keyup', function (event) {
                 console.log(event.key)
                 if (event.ctrlKey && (event.key === "c" || event.key === "C") ) {
                     event.preventDefault();
