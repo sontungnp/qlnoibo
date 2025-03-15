@@ -209,6 +209,31 @@ document.addEventListener("DOMContentLoaded", () => {
             $('#copy-btn').on('click', function () {
                 copySelectedRows();
             });
+
+            // =========== Thêm chuột phải chọn copy ===================
+            let contextMenu = $("#context-menu");
+
+            // Hiển thị menu chuột phải khi click vào dòng đã chọn
+            $("#data-table tbody").on("contextmenu", "tr.selected", function (event) {
+                event.preventDefault();
+                contextMenu.css({
+                    top: event.pageY + "px",
+                    left: event.pageX + "px"
+                }).show();
+            });
+
+            // Ẩn menu khi click ra ngoài
+            $(document).on("click", function () {
+                contextMenu.hide();
+            });
+
+            // Khi bấm "Copy Selected Rows"
+            $("#copy-selected").on("click", function () {
+                copySelectedRowsToClipboard();
+                contextMenu.hide();
+            });
+
+            // =====================================================
         });
     });
 });

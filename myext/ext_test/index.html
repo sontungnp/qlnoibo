@@ -34,6 +34,23 @@
         .highlight {
             background-color: #ffd966 !important; /* Màu vàng nhạt */
         }
+
+        .context-menu {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 5px;
+            list-style: none;
+            z-index: 1000;
+        }
+        .context-menu li {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .context-menu li:hover {
+            background: #eee;
+        }
     </style>
 </head>
 <body>
@@ -53,5 +70,10 @@
         </thead>
         <tbody id="table-body"></tbody>
     </table>
+
+    <!-- Menu ngữ cảnh -->
+    <ul id="context-menu" class="context-menu">
+        <li id="copy-selected">Copy Selected Rows</li>
+    </ul>
 </body>
 </html>
