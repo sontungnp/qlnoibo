@@ -169,16 +169,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-
             // Gán sự kiện Ctrl + C để copy
             $(document).on('keydown', function (event) {
                 console.log(event.key)
-                if (event.ctrlKey && event.key === "c") {
+                if (event.ctrlKey && (event.key === "c" || event.key === "C") ) {
                     event.preventDefault();
                     copySelectedRows();
                 }
             });
-
 
             // Thêm nút Copy vào DataTable
             $('#data-table_wrapper .top-controls').append('<button id="copy-btn" class="btn btn-primary">Copy Selected</button>');
