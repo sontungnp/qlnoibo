@@ -36,27 +36,23 @@
         }
 
         .context-menu {
-            display: none;
             position: absolute;
+            display: none;
             background: white;
             border: 1px solid #ccc;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-        }
-
-        .context-menu ul {
-            list-style: none;
-            margin: 0;
             padding: 5px 0;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            list-style: none;
+            z-index: 1000;
+            border-radius: 5px;
+            min-width: 120px;
         }
-
-        .context-menu ul li {
-            padding: 8px 15px;
+        .context-menu li {
+            padding: 8px 12px;
             cursor: pointer;
         }
-
-        .context-menu ul li:hover {
-            background-color: #f2f2f2;
+        .context-menu li:hover {
+            background: #f0f0f0;
         }
 
     </style>

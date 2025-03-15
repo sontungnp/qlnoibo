@@ -213,29 +213,32 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Hiển thị menu chuột phải khi click vào dòng đã chọn
-    $('#table-body').on('contextmenu', 'tr.highlight', function (event) {
-        event.preventDefault(); // Ngăn chặn menu mặc định của trình duyệt
+    $(document).ready(function () {
+        // Tạo menu chuột phải
+        let contextMenu = $('<ul id="context-menu" class="context-menu"><li id="copy-selected">Copy</li></ul>');
+        $('body').append(contextMenu);
 
-        let selectedRows = $('.highlight');
-        if (selectedRows.length === 0) return;
+        // Ẩn menu khi click ra ngoài
+        $(document).on("click", function () {
+            $("#context-menu").hide();
+        });
 
-        // Hiển thị menu tại vị trí chuột
-        $('#context-menu')
-            .css({ top: event.pageY + 'px', left: event.pageX + 'px' })
-            .fadeIn(200);
+        // Hiển thị menu khi chuột phải vào dòng đã chọn
+        $('#table-body').on('contextmenu', 'tr.highlight', function (event) {
+            event.preventDefault(); // Ngăn menu mặc định của trình duyệt
+
+            // Hiển thị menu tùy chỉnh tại vị trí con trỏ
+            $("#context-menu").css({
+                top: event.pageY + "px",
+                left: event.pageX + "px"
+            }).show();
+        });
+
+        // Xử lý sự kiện khi chọn "Copy" từ menu
+        $("#copy-selected").on("click", function () {
+            copySelectedRowsToClipboard();
+            $("#context-menu").hide();
+        });
     });
-
-    // Ẩn menu khi click ra ngoài
-    $(document).on('click', function () {
-        $('#context-menu').fadeOut(200);
-    });
-
-    // Xử lý khi click vào "Copy" trong menu
-    $('#context-copy').on('click', function () {
-        copySelectedRows();
-        $('#context-menu').fadeOut(200); // Ẩn menu sau khi copy
-    });
-
 
 });
