@@ -147,6 +147,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 lastSelectedRow = this; // Cập nhật dòng cuối cùng được chọn
             });
+
+            // Thêm sự kiện copy bằng nút hoặc phím tắt
+            function copySelectedRows() {
+                let copiedText = "";
+                $('.highlight').each(function () {
+                    let rowData = $(this).find('td').map(function () {
+                        return $(this).text().trim();
+                    }).get().join("\t"); // Ngăn cách bằng Tab để dễ dán vào Excel
+                    copiedText += rowData + "\n";
+                });
+
+                if (copiedText) {
+                    navigator.clipboard.writeText(copiedText).then(() => {
+                        alert("Copied to clipboard!");
+                    }).catch(err => console.error("Copy failed:", err));
+                } else {
+                    alert("No rows selected!");
+                }
+            }
+
+            // Gán sự kiện copy khi nhấn Ctrl + C
+            $(document).keydown(function (event) {
+                if (event.ctrlKey && event.key === "c") {
+                    copySelectedRows();
+                }
+            });
+
+            // Thêm nút Copy vào DataTable
+            $('#data-table_wrapper .top-controls').append('<button id="copy-btn" class="btn btn-primary">Copy Selected</button>');
+
+            // Xử lý sự kiện click cho nút Copy
+            $('#copy-btn').on('click', function () {
+                copySelectedRows();
+            });
         });
     });
 });
