@@ -40,17 +40,25 @@
             position: absolute;
             background: white;
             border: 1px solid #ccc;
-            padding: 5px;
-            list-style: none;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
             z-index: 1000;
         }
-        .context-menu li {
-            padding: 5px 10px;
+
+        .context-menu ul {
+            list-style: none;
+            margin: 0;
+            padding: 5px 0;
+        }
+
+        .context-menu ul li {
+            padding: 8px 15px;
             cursor: pointer;
         }
-        .context-menu li:hover {
-            background: #eee;
+
+        .context-menu ul li:hover {
+            background-color: #f2f2f2;
         }
+
     </style>
 </head>
 <body>
@@ -71,9 +79,11 @@
         <tbody id="table-body"></tbody>
     </table>
 
-    <!-- Menu ngữ cảnh -->
-    <ul id="context-menu" class="context-menu">
-        <li id="copy-selected">Copy Selected Rows</li>
-    </ul>
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu">
+        <ul>
+            <li id="context-copy">Copy</li>
+        </ul>
+    </div>
 </body>
 </html>

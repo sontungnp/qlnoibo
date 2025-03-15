@@ -210,30 +210,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 copySelectedRows();
             });
 
-            // =========== Thêm chuột phải chọn copy ===================
-            let contextMenu = $("#context-menu");
-
-            // Hiển thị menu chuột phải khi click vào dòng đã chọn
-            $("#data-table tbody").on("contextmenu", "tr.selected", function (event) {
-                event.preventDefault();
-                contextMenu.css({
-                    top: event.pageY + "px",
-                    left: event.pageX + "px"
-                }).show();
-            });
-
-            // Ẩn menu khi click ra ngoài
-            $(document).on("click", function () {
-                contextMenu.hide();
-            });
-
-            // Khi bấm "Copy Selected Rows"
-            $("#copy-selected").on("click", function () {
-                copySelectedRowsToClipboard();
-                contextMenu.hide();
-            });
-
-            // =====================================================
         });
     });
+
+    // Hiển thị menu chuột phải khi click vào dòng đã chọn
+    $('#table-body').on('contextmenu', 'tr.highlight', function (event) {
+        event.preventDefault(); // Ngăn chặn menu mặc định của trình duyệt
+
+        let selectedRows = $('.highlight');
+        if (selectedRows.length === 0) return;
+
+        // Hiển thị menu tại vị trí chuột
+        $('#context-menu')
+            .css({ top: event.pageY + 'px', left: event.pageX + 'px' })
+            .fadeIn(200);
+    });
+
+    // Ẩn menu khi click ra ngoài
+    $(document).on('click', function () {
+        $('#context-menu').fadeOut(200);
+    });
+
+    // Xử lý khi click vào "Copy" trong menu
+    $('#context-copy').on('click', function () {
+        copySelectedRows();
+        $('#context-menu').fadeOut(200); // Ẩn menu sau khi copy
+    });
+
+
 });
