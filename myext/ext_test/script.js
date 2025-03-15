@@ -169,8 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // Gán sự kiện Ctrl + C để copy
-            $(document).keydown(function (event) {
+            $(document).on('keydown', function (event) {
                 if (event.ctrlKey && event.key === "c") {
+                    event.preventDefault(); // Ngăn chặn hành vi mặc định
                     copySelectedRows();
                 }
             });
