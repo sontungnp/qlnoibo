@@ -153,21 +153,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 let copiedText = "";
                 $('.highlight').each(function () {
                     let rowData = $(this).find('td').map(function () {
-                        return $(this).text().trim();
-                    }).get().join("\t"); // Ngăn cách bằng Tab để dễ dán vào Excel
+                        return $(this).text().trim(); // Lấy nội dung text của từng ô
+                    }).get().join("\t"); // Ngăn cách bằng Tab để giữ đúng định dạng Excel
                     copiedText += rowData + "\n";
                 });
 
                 if (copiedText) {
-                    navigator.clipboard.writeText(copiedText).then(() => {
-                        alert("Copied to clipboard!");
-                    }).catch(err => console.error("Copy failed:", err));
+                    let textarea = $('<textarea>').val(copiedText).appendTo('body').select();
+                    document.execCommand('copy'); // Thực hiện copy
+                    textarea.remove(); // Xóa textarea sau khi copy
+                    alert("Copied to clipboard!");
                 } else {
                     alert("No rows selected!");
                 }
             }
 
-            // Gán sự kiện copy khi nhấn Ctrl + C
+            // Gán sự kiện Ctrl + C để copy
             $(document).keydown(function (event) {
                 if (event.ctrlKey && event.key === "c") {
                     copySelectedRows();
