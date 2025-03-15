@@ -178,6 +178,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
+            $(document).on('copy', function (event) {
+                console.log("Custom copy event triggered!");
+                event.preventDefault(); // Ngăn copy mặc định
+
+                // Lấy dữ liệu cần copy từ hàm copySelectedRows()
+                const copiedText = copySelectedRows(true); 
+
+                if (event.originalEvent.clipboardData) {
+                    event.originalEvent.clipboardData.setData("text/plain", copiedText);
+                } else if (window.clipboardData) {
+                    window.clipboardData.setData("Text", copiedText);
+                }
+
+                console.log("Copied:", copiedText);
+            });
+
             // Thêm nút Copy vào DataTable
             $('#data-table_wrapper .top-controls').append('<button id="copy-btn" class="btn btn-primary">Copy Selected</button>');
 
