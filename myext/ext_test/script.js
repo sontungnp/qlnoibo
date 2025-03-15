@@ -118,6 +118,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 let val = $(`#filter-${index}`).val();
                 table.column(index).search(val ? `^${val}$` : '', true, false).draw();
             };
+
+            // Sự kiện click để highlight dòng
+            $('#table-body').on('click', 'tr', function() {
+                $('#table-body tr').removeClass('highlight');  // Xóa highlight của các dòng khác
+                $(this).addClass('highlight');  // Thêm highlight cho dòng được click
+            });
         });
     });
 });
