@@ -193,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // NEW
             // Tạo menu chuột phải
             let contextMenu = $('<ul id="context-menu" class="context-menu"><li id="copy-selected">Copy</li></ul>');
-            $('body').append(contextMenu);
+            $('#table-body').append(contextMenu);
 
             // Ẩn menu khi click ra ngoài
             $(document).on("click", function () {
@@ -217,15 +217,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 $("#context-menu").hide();
             });
 
-        });
-    });
-
-    $(document).ready(function () {
-        $(document).on('keydown', function (event) {
-            if (event.ctrlKey && event.key === "c") {
-                event.preventDefault();
-                copySelectedRows();
-            }
         });
     });
 
