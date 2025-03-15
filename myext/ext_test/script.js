@@ -120,9 +120,32 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             // Sự kiện click để highlight dòng
-            $('#table-body').on('click', 'tr', function() {
-                $('#table-body tr').removeClass('highlight');  // Xóa highlight của các dòng khác
-                $(this).addClass('highlight');  // Thêm highlight cho dòng được click
+            // $('#table-body').on('click', 'tr', function() {
+            //     $('#table-body tr').removeClass('highlight');  // Xóa highlight của các dòng khác
+            //     $(this).addClass('highlight');  // Thêm highlight cho dòng được click
+            // });
+
+            let lastSelectedRow = null; // Lưu trữ dòng được chọn cuối cùng
+
+            $('#table-body').on('click', 'tr', function(event) {
+                if (event.ctrlKey) {
+                    // Nhấn Ctrl: Chọn/bỏ chọn dòng hiện tại
+                    $(this).toggleClass('highlight');
+                } else if (event.shiftKey && lastSelectedRow) {
+                    // Nhấn Shift: Chọn nhiều dòng từ lastSelectedRow đến dòng hiện tại
+                    let rows = $('#table-body tr');
+                    let start = rows.index(lastSelectedRow);
+                    let end = rows.index(this);
+                    let [min, max] = [Math.min(start, end), Math.max(start, end)];
+
+                    rows.slice(min, max + 1).addClass('highlight');
+                } else {
+                    // Không nhấn phím nào: Chọn một dòng duy nhất (bỏ chọn các dòng khác)
+                    $('#table-body tr').removeClass('highlight');
+                    $(this).addClass('highlight');
+                }
+
+                lastSelectedRow = this; // Cập nhật dòng cuối cùng được chọn
             });
         });
     });
