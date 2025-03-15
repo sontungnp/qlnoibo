@@ -168,11 +168,37 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
+            function copySelectedRowsToClipboard() {
+                let selectedRows = $('.selected'); // Lấy tất cả dòng đang được chọn
+                if (selectedRows.length === 0) return;
+
+                let copiedData = [];
+                selectedRows.each(function () {
+                    let rowData = [];
+                    $(this).find('td').each(function () {
+                        rowData.push($(this).text().trim()); // Lấy nội dung từng ô
+                    });
+                    copiedData.push(rowData.join("\t")); // Ngăn cách các cột bằng tab
+                });
+
+                let finalData = copiedData.join("\n"); // Ngăn cách các dòng bằng xuống dòng
+
+                // Tạo textarea ẩn để copy vào clipboard
+                let tempTextarea = $('<textarea>').val(finalData).css({ position: 'absolute', left: '-9999px' });
+                $('body').append(tempTextarea);
+                tempTextarea.select();
+                document.execCommand('copy');
+                tempTextarea.remove();
+
+                alert("Copied " + selectedRows.length + " row(s) to clipboard!");
+            }
+
+
             // Gán sự kiện Ctrl + C để copy
             $(document).on('keydown', function (event) {
                 if (event.ctrlKey && event.key === "c") {
-                    event.preventDefault(); // Ngăn chặn hành vi mặc định
-                    copySelectedRows();
+                    event.preventDefault();
+                    copySelectedRowsToClipboard();
                 }
             });
 
