@@ -173,14 +173,11 @@ document.addEventListener("DOMContentLoaded", () => {
             $(document).on('keyup', function (event) {
                 console.log(event.key)
                 if (event.ctrlKey && (event.key === "c" || event.key === "C") ) {
-                    event.preventDefault();
                     copySelectedRows();
                 }
             });
 
             $(document).on('copy', function (event) {
-                console.log("Custom copy event triggered!");
-                event.preventDefault(); // Ngăn copy mặc định
                 copySelectedRows();
             });
 
