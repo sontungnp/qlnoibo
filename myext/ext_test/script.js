@@ -177,9 +177,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            $(document).on('copy', function (event) {
-                copySelectedRows();
-            });
+            // $(document).on('copy', function (event) {
+            //     copySelectedRows();
+            // });
 
             // Thêm nút Copy vào DataTable
             $('#data-table_wrapper .top-controls').append('<button id="copy-btn" class="btn btn-primary">Copy Selected</button>');
