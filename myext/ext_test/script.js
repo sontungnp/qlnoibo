@@ -193,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // NEW
             // Tạo menu chuột phải
             let contextMenu = $('<ul id="context-menu" class="context-menu"><li id="copy-selected">Copy</li></ul>');
-            $('#table-body').append(contextMenu);
+            $('body').append(contextMenu);
 
             // Ẩn menu khi click ra ngoài
             $(document).on("click", function () {
