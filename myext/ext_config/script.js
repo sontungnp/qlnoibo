@@ -2,48 +2,40 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     tableau.extensions.initializeAsync().then(() => {
-        let hot; // Biến chứa bảng dữ liệu
+        let table;
 
-        // Kết nối tới Tableau khi nhấn Load Data
-        document.getElementById("loadData").addEventListener("click", function () {
-            tableau.extensions.initializeAsync().then(() => {
-                const dashboard = tableau.extensions.dashboardContent.dashboard;
-                const worksheet = dashboard.worksheets[0]; // Lấy worksheet đầu tiên
+        $("#load-data").click(async function () {
+            await tableau.extensions.initializeAsync();
+            let dashboard = tableau.extensions.dashboardContent.dashboard;
+            let worksheet = dashboard.worksheets[0];
+            let data = await worksheet.getSummaryDataAsync();
 
-                worksheet.getSummaryDataAsync().then((dataTable) => {
-                    const fieldNames = dataTable.columns.map(col => col.fieldName);
-                    const dataValues = dataTable.data.map(row => row.map(cell => cell.formattedValue));
+            let columns = data.columns.map(col => ({ title: col.fieldName, field: col.fieldName, headerFilter: "input" }));
+            let rows = data.data.map(row => {
+                let obj = {};
+                row.forEach((cell, i) => obj[data.columns[i].fieldName] = cell.value);
+                return obj;
+            });
 
-                    renderTable(fieldNames, dataValues);
-                });
+            if (table) table.destroy();
+            table = new Tabulator("#table-container", {
+                data: rows,
+                columns: columns,
+                layout: "fitDataStretch",
+                pagination: true,
+                paginationSize: 10,
+                movableColumns: true,
+                clipboard: true,
+                clipboardCopyConfig: { rowHeaders: false, columnHeaders: false },
+            });
+
+            $("#filter").on("keyup", function () {
+                table.setFilter("any", "like", $(this).val());
             });
         });
 
-        // Hàm hiển thị bảng với Handsontable
-        function renderTable(columns, data) {
-            const container = document.getElementById("tableContainer");
-            container.innerHTML = ""; // Xóa bảng cũ nếu có
-
-            hot = new Handsontable(container, {
-                data: data,
-                colHeaders: columns,
-                rowHeaders: true,
-                dropdownMenu: true,
-                filters: true,
-                manualColumnResize: true,
-                manualRowResize: true,
-                columnSorting: true,
-                contextMenu: true,
-                licenseKey: "non-commercial-and-evaluation"
-            });
-        }
-
-        // Xuất dữ liệu ra CSV
-        document.getElementById("exportCSV").addEventListener("click", function () {
-            if (hot) {
-                const csv = Handsontable.plugins.ExportFile.getPlugin(hot, 'exportFile');
-                csv.downloadFile('csv', {filename: 'tableau_data'});
-            }
+        $("#download-excel").click(() => {
+            table.download("xlsx", "data.xlsx", { sheetName: "Table Data" });
         });
     });
 

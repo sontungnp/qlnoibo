@@ -3,26 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Popup</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@12.4.0/dist/handsontable.full.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/handsontable@12.4.0/dist/handsontable.full.min.js"></script>
-    <script src="../../lib/tableau.extensions.1.latest.js"></script>
-    <script src="script.js"></script>
+    <title>Tableau Tabulator Extension</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tableau/extensions-api"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.3.4/js/tabulator.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/5.3.4/css/tabulator.min.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        
+        body { font-family: Arial, sans-serif; padding: 10px; }
+        #table-container { margin-top: 10px; }
+        #filter { margin-bottom: 10px; width: 100%; padding: 5px; }
     </style>
 </head>
 <body>
-    <button id="loadData">Load Data</button>
-    <button id="exportCSV">Export CSV</button>
-    <div id="tableContainer"></div>
-
-    <script src="handsontable.full.min.js"></script>
-    <script src="https://connectors.tableau.com/libs/tableau.extensions.1.latest.js"></script>
-    <script src="script.js"></script>
+    <button id="load-data">Load Data</button>
+    <input id="filter" type="text" placeholder="Global Search...">
+    <div id="table-container"></div>
+    <button id="download-excel">Export to Excel</button>
 </body>
 </html>
