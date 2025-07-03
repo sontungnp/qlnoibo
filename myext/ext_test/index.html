@@ -1,11 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tableau Extension Popup</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
+    />
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
@@ -13,73 +17,98 @@
     <script src="../../lib/tableau.extensions.1.latest.js"></script>
     <script src="script.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 8px; text-align: left; }
-        select, input { width: 100%; padding: 5px; margin-top: 5px; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+      }
+      select,
+      input {
+        width: 100%;
+        padding: 5px;
+        margin-top: 5px;
+      }
 
-        /* Layout cho thanh điều khiển */
-        .top-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
+      /* Layout cho thanh điều khiển */
+      .top-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
 
-        /* Canh chỉnh export button */
-        .dt-buttons {
-            margin-left: auto !important;
-        }
+      /* Canh chỉnh export button */
+      .dt-buttons {
+        margin-left: auto !important;
+      }
 
-        .highlight {
-            background-color: #ffd966 !important; /* Màu vàng nhạt */
-        }
+      .highlight {
+        background-color: #ffd966 !important; /* Màu vàng nhạt */
+      }
 
-        .context-menu {
-            position: absolute;
-            display: none;
-            background: white;
-            border: 1px solid #ccc;
-            padding: 5px 0;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-            list-style: none;
-            z-index: 1000;
-            border-radius: 5px;
-            min-width: 120px;
-        }
-        .context-menu li {
-            padding: 8px 12px;
-            cursor: pointer;
-        }
-        .context-menu li:hover {
-            background: #f0f0f0;
-        }
+      .context-menu {
+        position: absolute;
+        display: none;
+        background: white;
+        border: 1px solid #ccc;
+        padding: 5px 0;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        list-style: none;
+        z-index: 1000;
+        border-radius: 5px;
+        min-width: 120px;
+      }
+      .context-menu li {
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      .context-menu li:hover {
+        background: #f0f0f0;
+      }
 
+      .toggle-btn {
+        cursor: pointer;
+        font-weight: bold;
+        margin-right: 5px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h2>Custom Table with Filters & Export 5</h2>
 
     <!-- Thanh điều khiển -->
     <div class="top-controls">
-        <div id="table-length"></div> <!-- "Show X entries" -->
-        <div id="table-search"></div> <!-- Ô tìm kiếm -->
-        <div id="table-export"></div> <!-- Export Excel -->
+      <div id="table-length"></div>
+      <!-- "Show X entries" -->
+      <div id="table-search"></div>
+      <!-- Ô tìm kiếm -->
+      <div id="table-export"></div>
+      <!-- Export Excel -->
     </div>
 
     <table id="data-table" class="display">
-        <thead>
-            <tr id="table-header"></tr>   <!-- Tiêu đề cột -->
-            <tr id="table-filters"></tr>  <!-- Ô lọc ngay dưới tiêu đề -->
-        </thead>
-        <tbody id="table-body"></tbody>
+      <thead>
+        <tr id="table-header"></tr>
+        <!-- Tiêu đề cột -->
+        <tr id="table-filters"></tr>
+        <!-- Ô lọc ngay dưới tiêu đề -->
+      </thead>
+      <tbody id="table-body"></tbody>
     </table>
 
     <!-- Context Menu -->
     <div id="context-menu" class="context-menu">
-        <ul>
-            <li id="context-copy">Copy</li>
-        </ul>
+      <ul>
+        <li id="context-copy">Copy</li>
+      </ul>
     </div>
-</body>
+  </body>
 </html>
