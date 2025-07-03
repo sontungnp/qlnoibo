@@ -56,8 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // HEADER
         $('#table-header').append(`<th>Tree</th>`)
+        $('#table-filters').append(
+          `<th><input type="text" class="column-filter" placeholder="Filter Tree" /></th>`
+        )
+
         measureCols.forEach((col) => {
           $('#table-header').append(`<th>${col}</th>`)
+          $('#table-filters').append(
+            `<th><input type="text" class="column-filter" placeholder="Filter ${col}" /></th>`
+          )
         })
 
         // BODY
