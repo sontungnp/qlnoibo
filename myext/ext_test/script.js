@@ -68,29 +68,27 @@ document.addEventListener('DOMContentLoaded', () => {
         })
 
         // BODY
-        // nodeList.forEach((node) => {
-        //   let indent = (node.level - 1) * 20
-        //   let toggleBtn = node.isLeaf
-        //     ? ''
-        //     : `<span class="toggle-btn">[+]</span> `
-        //   let rowHTML = `<tr data-node-id="${node.id}" ${
-        //     node.parent
-        //       ? `data-parent-id="${node.parent}" style="display:none"`
-        //       : ''
-        //   }>
-        //                 <td style="padding-left:${indent}px">${toggleBtn}${
-        //     node.label
-        //   }</td>`
+        nodeList.forEach((node) => {
+          let indent = (node.level - 1) * 20
+          let toggleBtn = node.isLeaf
+            ? ''
+            : `<span class="toggle-btn">[+]</span> `
+          let rowHTML = `<tr data-node-id="${node.id}" ${
+            node.parent
+              ? `data-parent-id="${node.parent}" style="display:none"`
+              : ''
+          }>
+                        <td style="padding-left:${indent}px">${toggleBtn}${
+            node.label
+          }</td>`
 
-        //   measureCols.forEach((col) => {
-        //     rowHTML += `<td>${node.measures[col] || ''}</td>`
-        //   })
+          measureCols.forEach((col) => {
+            rowHTML += `<td>${node.measures[col] || ''}</td>`
+          })
 
-        //   rowHTML += `</tr>`
-        //   $('#table-body').append(rowHTML)
-        // })
-        // Gọi hàm bắt đầu từ root
-        renderNodeAndChildren(null)
+          rowHTML += `</tr>`
+          $('#table-body').append(rowHTML)
+        })
 
         // TOGGLE TREE
         $('.toggle-btn').on('click', function () {
@@ -260,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let table = $('#data-table').DataTable({
         paging: true,
         searching: true,
-        ordering: true,
+        ordering: false,
         pageLength: 10,
         dom: '<"top-controls"lBf>rtip', // Định vị controls lên trên
         buttons: [
