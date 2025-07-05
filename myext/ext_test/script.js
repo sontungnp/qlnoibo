@@ -68,27 +68,29 @@ document.addEventListener('DOMContentLoaded', () => {
         })
 
         // BODY
-        nodeList.forEach((node) => {
-          let indent = (node.level - 1) * 20
-          let toggleBtn = node.isLeaf
-            ? ''
-            : `<span class="toggle-btn">[+]</span> `
-          let rowHTML = `<tr data-node-id="${node.id}" ${
-            node.parent
-              ? `data-parent-id="${node.parent}" style="display:none"`
-              : ''
-          }>
-                        <td style="padding-left:${indent}px">${toggleBtn}${
-            node.label
-          }</td>`
+        // nodeList.forEach((node) => {
+        //   let indent = (node.level - 1) * 20
+        //   let toggleBtn = node.isLeaf
+        //     ? ''
+        //     : `<span class="toggle-btn">[+]</span> `
+        //   let rowHTML = `<tr data-node-id="${node.id}" ${
+        //     node.parent
+        //       ? `data-parent-id="${node.parent}" style="display:none"`
+        //       : ''
+        //   }>
+        //                 <td style="padding-left:${indent}px">${toggleBtn}${
+        //     node.label
+        //   }</td>`
 
-          measureCols.forEach((col) => {
-            rowHTML += `<td>${node.measures[col] || ''}</td>`
-          })
+        //   measureCols.forEach((col) => {
+        //     rowHTML += `<td>${node.measures[col] || ''}</td>`
+        //   })
 
-          rowHTML += `</tr>`
-          $('#table-body').append(rowHTML)
-        })
+        //   rowHTML += `</tr>`
+        //   $('#table-body').append(rowHTML)
+        // })
+        // Gọi hàm bắt đầu từ root
+        renderNodeAndChildren(null)
 
         // TOGGLE TREE
         $('.toggle-btn').on('click', function () {
@@ -121,6 +123,35 @@ document.addEventListener('DOMContentLoaded', () => {
           $(`tr[data-parent-id="${parentId}"]`).each(function () {
             $(this).show()
           })
+        }
+
+        function renderNodeAndChildren(parentId = null) {
+          nodeList
+            .filter((node) => node.parent === parentId)
+            .forEach((node) => {
+              let indent = (node.level - 1) * 20
+              let toggleBtn = node.isLeaf
+                ? ''
+                : `<span class="toggle-btn">[+]</span> `
+              let rowHTML = `<tr data-node-id="${node.id}" ${
+                node.parent
+                  ? `data-parent-id="${node.parent}" style="display:none"`
+                  : ''
+              }>
+                      <td style="padding-left:${indent}px">${toggleBtn}${
+                node.label
+              }</td>`
+
+              measureCols.forEach((col) => {
+                rowHTML += `<td>${node.measures[col] || ''}</td>`
+              })
+
+              rowHTML += `</tr>`
+              $('#table-body').append(rowHTML)
+
+              // Đệ quy: sau khi thêm dòng cha, thêm dòng con
+              renderNodeAndChildren(node.id)
+            })
         }
       } else {
         // TRƯỜNG HỢP BÌNH THƯỜNG
