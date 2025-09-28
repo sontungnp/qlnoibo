@@ -1,122 +1,157 @@
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tableau Extension Tree Table</title>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css"
-    />
-
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-
+    <title>Tableau Extension</title>
     <script src="../../lib/tableau.extensions.1.latest.js"></script>
     <script src="script.js"></script>
     <style>
+      html,
       body {
-        font-family: Arial, sans-serif;
+        height: 100%;
         margin: 0;
-        padding: 10px;
-      }
-      .header-container {
-        position: sticky;
-        top: 0;
-        background: #fff;
-        z-index: 20;
-        border-bottom: 1px solid #ddd;
-        width: 100%;
-        background-color: #f2f2f2;
-        box-sizing: border-box;
-      }
-      #global-search {
-        width: 100%;
-        max-width: 400px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-      }
-      #data-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      #data-table th,
-      #data-table td {
-        border: 1px solid #ddd;
-        padding: 6px;
-        text-align: left;
-      }
-      #data-table thead tr:first-child th {
-        position: sticky;
-        top: 48px;
-        background: #f5f5f5;
-        z-index: 10;
-      }
-      #data-table thead tr:nth-child(2) th {
-        position: sticky;
-        top: 75px;
-        background: #fafafa;
-        z-index: 9;
-      }
-      #data-table tbody tr.total-row {
-        position: sticky;
-        bottom: 0;
-        background-color: #f2f2f2;
-        font-weight: bold;
-        z-index: 8;
-      }
-      tr.selected-row {
-        background-color: #e6d3c6 !important;
+        padding: 0;
       }
 
-      /* Tree styling */
-      .tree-toggle {
-        cursor: pointer;
-        margin-right: 6px;
+      .table-container {
+        height: 100vh; /* hoặc chiều cao cụ thể nếu muốn */
+        overflow: auto;
+        position: relative;
+      }
+      /* Thẻ table phải có border collapse */
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: Arial, sans-serif;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
         font-weight: bold;
+        text-align: center;
+        vertical-align: middle;
       }
-      .tree-node {
-        padding-left: 20px;
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
       }
-      .tree-collapsed .tree-children {
-        display: none;
+      .expander {
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 5px;
+      }
+      .expander:hover {
+        background-color: #e0e0e0;
+        border-radius: 4px;
+      }
+      input#search {
+        width: 100%;
+        margin-bottom: 1px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .filter-btn {
+        padding: 5px 10px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .filter-btn:hover {
+        background-color: #45a049;
+      }
+
+      /* Sticky input search */
+      input#search {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background-color: white;
+      }
+
+      /* Sticky header */
+      #dataTable thead tr:nth-child(1) th {
+        position: sticky;
+        top: 35px; /* chiều cao của input search */
+        background-color: #f2f2f2;
+        z-index: 2;
+      }
+
+      /* Sticky filter row */
+      #dataTable thead tr:nth-child(2) th {
+        position: sticky;
+        top: 68px; /* chiều cao input + header */
+        background-color: #f2f2f2;
+        z-index: 1;
+      }
+
+      #dataTable td:first-child,
+      #dataTable th:first-child {
+        width: 300px; /* hoặc auto + min-width */
+        min-width: 200px;
+        max-width: 400px;
+        white-space: nowrap; /* không xuống dòng */
+      }
+
+      tr.selected {
+        background-color: #cce5ff; /* xanh nhạt */
+      }
+
+      #tool-box {
+        display: flex;
+        align-items: center; /* canh giữa theo chiều dọc */
+        gap: 10px; /* khoảng cách giữa input và button */
+        /* padding: 5px; */
+        background: white;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        border-bottom: 1px solid #ccc;
+      }
+
+      #tool-box input#search {
+        flex: 1; /* để input chiếm hết chiều rộng còn lại */
+      }
+
+      #tool-box button {
+        padding: 8px 12px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      #tool-box button:hover {
+        background-color: #0056b3;
       }
     </style>
   </head>
   <body>
-    <div class="header-container">
+    <div id="tool-box">
       <input
         type="text"
-        id="global-search"
-        placeholder="Tìm kiếm dữ liệu..."
-        style="
-          margin: 10px 0;
-          padding: 6px;
-          width: 100%;
-          max-width: 400px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-        "
+        id="search"
+        placeholder="Search across table..."
+        onkeyup="globalSearch()"
       />
+      <button>Export Excel</button>
     </div>
-    <table id="data-table">
-      <thead>
-        <tr id="table-header"></tr>
-        <tr id="table-filter"></tr>
-      </thead>
-      <tbody id="table-body"></tbody>
+
+    <table id="dataTable">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
     </table>
   </body>
 </html>
