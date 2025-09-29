@@ -72,14 +72,6 @@
         background-color: #45a049;
       }
 
-      /* Sticky input search */
-      input#search {
-        position: sticky;
-        top: 0;
-        z-index: 3;
-        background-color: white;
-      }
-
       /* Sticky header */
       #dataTable thead tr:nth-child(1) th {
         position: sticky;
@@ -139,19 +131,23 @@
     </style>
   </head>
   <body>
-    <div id="tool-box">
-      <input
-        type="text"
-        id="search"
-        placeholder="Search across table..."
-        onkeyup="globalSearch()"
-      />
-      <button>Export Excel</button>
-    </div>
+    <div class="table-container">
+      <div id="tool-box">
+        <button onclick="expandAll()">Expand All</button>
+        <button onclick="collapseAll()">Collapse All</button>
+        <input
+          type="text"
+          id="search"
+          placeholder="Search across table..."
+          onkeyup="globalSearch()"
+        />
+        <button>Export Excel</button>
+      </div>
 
-    <table id="dataTable">
-      <thead id="thead"></thead>
-      <tbody id="tbody"></tbody>
-    </table>
+      <table id="dataTable">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
   </body>
 </html>

@@ -2,6 +2,7 @@
 
 let selectedRows = new Set() // lưu index của các dòng được chọn
 let lastClickedIndex = null
+let root = null
 
 // click chọn dòng
 function attachRowClick(tr) {
@@ -38,6 +39,16 @@ function attachRowClick(tr) {
       lastClickedIndex = rowIndex
     }
   })
+}
+
+// Hàm chuẩn hóa chỉ để đồng bộ Unicode, không bỏ dấu
+function normalizeUnicode(str) {
+  return str
+    ? str
+        .normalize('NFC') // chuẩn hóa Unicode về NFC
+        .toLowerCase() // chuyển về thường để bỏ phân biệt hoa/thường
+        .trim() // bỏ khoảng trắng thừa
+    : ''
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -128,13 +139,22 @@ function processAndDisplayData(dataTable, worksheet) {
   let valueIndices = pivotedColumns
     .map((_, i) => (treeIndices.includes(i) ? -1 : i))
     .filter((i) => i >= 0)
+
+  // Xác định các cột measure và dimension
+  let measureIndices = valueIndices.filter((i) =>
+    ['number', 'float', 'integer'].includes(pivotedColumns[i].dataType)
+  )
+  let dimIndices = valueIndices.filter(
+    (i) => !['number', 'float', 'integer'].includes(pivotedColumns[i].dataType)
+  )
+
   let tableColumns = [
     { fieldName: 'Hierarchy' },
     ...valueIndices.map((i) => pivotedColumns[i])
   ]
 
   // Build tree structure
-  let root = {
+  root = {
     name: 'Root',
     children: [],
     level: 0,
@@ -171,14 +191,26 @@ function processAndDisplayData(dataTable, worksheet) {
   function computeAggregates(node) {
     if (node.children.length === 0) return
     node.children.forEach(computeAggregates)
-    node.data = new Array(valueIndices.length)
-      .fill(0)
-      .map(() => ({ value: 0, formattedValue: '0' }))
+
+    // Khởi tạo node.data với giá trị mặc định
+    node.data = new Array(valueIndices.length).fill(0).map((_, idx) => {
+      // Nếu là cột dimension, để trống
+      if (dimIndices.includes(valueIndices[idx])) {
+        return { value: null, formattedValue: '' }
+      }
+      // Nếu là cột measure, khởi tạo giá trị số 0
+      return { value: 0, formattedValue: '0' }
+    })
+
+    // Tính tổng chỉ cho các cột measure
     for (let child of node.children) {
       child.data.forEach((cd, j) => {
-        let v = parseFloat(cd.value) || 0
-        node.data[j].value += v
-        node.data[j].formattedValue = node.data[j].value.toString()
+        // Chỉ tính tổng nếu cột thuộc measureIndices
+        if (measureIndices.includes(valueIndices[j])) {
+          let v = parseFloat(cd.value) || 0
+          node.data[j].value += v
+          node.data[j].formattedValue = node.data[j].value.toString()
+        }
       })
     }
   }
@@ -258,9 +290,14 @@ function processAndDisplayData(dataTable, worksheet) {
   }
   root.children.forEach((child) => renderNode(child, root))
 
+  // Sau khi render xong, tính toán và cập nhật sticky positions
+  // updateStickyPositions()
+
   // Step 6: Global search
   window.globalSearch = function () {
-    let searchText = document.getElementById('search').value.toLowerCase()
+    let searchText = normalizeUnicode(
+      document.getElementById('search').value.toLowerCase()
+    )
     updateFilter(root, searchText)
     // Update visibility after filter
     if (searchText === '') {
@@ -307,6 +344,37 @@ function toggleExpand(node, expander) {
   } else {
     hideDescendants(node)
   }
+}
+
+// Mở rộng tất cả các node
+function expandAll(node = root) {
+  if (!node) return
+  node.isExpanded = true
+  if (node.row) {
+    const expander = node.row.querySelector('.expander')
+    if (expander) {
+      expander.textContent = '−'
+      expander.title = 'Collapse'
+    }
+    node.row.style.display = 'table-row' // Hiển thị cả node lá
+  }
+  node.children.forEach(expandAll)
+}
+
+// Thu gọn tất cả các node
+function collapseAll() {
+  root.children.forEach((child) => {
+    if (child.row) {
+      child.isExpanded = false
+      const expander = child.row.querySelector('.expander')
+      if (expander) {
+        expander.textContent = '+'
+        expander.title = 'Expand'
+      }
+      child.row.style.display = 'table-row' // Giữ node cấp cao nhất hiển thị
+      hideDescendants(child) // Ẩn tất cả node con
+    }
+  })
 }
 
 function showDescendants(node) {
