@@ -149,7 +149,6 @@ function renderTable(headers, data, colWidths, isMeasure) {
 
       // wrapper
       const comboWrapper = document.createElement('div')
-      comboWrapper.className = 'combo-wrapper' // ✅ Thêm dòng này
       comboWrapper.style.position = 'relative'
       comboWrapper.style.width = '100%'
 
@@ -392,7 +391,7 @@ function renderTable(headers, data, colWidths, isMeasure) {
         updateDisplayLabel()
       }
 
-      // Cập nhật label hiển thị (như code cũ cho multi, cải thiện advanced với icon + tooltip)
+      // Cập nhật label hiển thị
       function updateDisplayLabel() {
         const filter = activeFilters[idx]
         if (filter.mode === 'multi') {
@@ -402,28 +401,11 @@ function renderTable(headers, data, colWidths, isMeasure) {
           } else if (selected.length === 0) {
             display.textContent = '(Trống)'
           } else {
-            // Giữ nguyên code cũ: join bằng comma, CSS sẽ tự ellipsis nếu dài
+            // ✅ Quay về code cũ: join bằng comma, CSS sẽ tự ellipsis nếu dài
             display.textContent = selected.join(', ')
           }
         } else {
-          // ✅ Cải thiện advanced: Thêm icon ⚙️, text ngắn gọn, và tooltip full info
-          // ✅ Fix: Thêm quote cho tất cả keys string
-          const operatorLabel =
-            {
-              '=': '=',
-              '!=': '≠',
-              '>': '>',
-              '<': '<',
-              '>=': '≥',
-              '<=': '≤',
-              contains: 'Chứa',
-              startsWith: 'Bắt đầu',
-              endsWith: 'Kết thúc'
-            }[filter.operator] || filter.operator // Symbol ngắn gọn cho operator
-          display.textContent = `⚙️ ${operatorLabel} ${filter.value}` // Icon + short label
-          // Tooltip: Hiển thị full khi hover (không cần mở dropdown)
-          const colType = visibleIsMeasure[idx] ? 'số' : 'chuỗi'
-          display.title = `Advanced Filter đang áp dụng: ${filter.operator} ${filter.value} (cột ${colType})`
+          display.textContent = `Nâng cao: ${filter.operator} ${filter.value}`
         }
         display.appendChild(arrow)
       }
@@ -676,7 +658,7 @@ function openAdvancedModal(colIdx, isMeasure, visibleData, distinct) {
     }
 
     activeFilters[colIdx] = { mode: 'advanced', operator, value }
-    applyFilterGlobal(colIdx) // Truyền colIdx để update label
+    applyFilterGlobal() // Gọi global apply
     modal.close()
   }
 
@@ -684,16 +666,16 @@ function openAdvancedModal(colIdx, isMeasure, visibleData, distinct) {
   clearBtn.onclick = () => {
     delete activeFilters[colIdx]
     activeFilters[colIdx] = { mode: 'multi', values: distinct.slice() } // Reset về multi all
-    applyFilterGlobal(colIdx) // Truyền colIdx để update label
+    applyFilterGlobal()
     modal.close()
   }
 
   modal.showModal()
 }
 
-// Global applyFilter (gọi từ modal) – Fix: Update label thủ công cho changed col
-function applyFilterGlobal(changedColIdx = null) {
-  if (window.currentVisibleData && window.currentVisibleIsMeasure) {
+// Global applyFilter (gọi từ modal)
+function applyFilterGlobal() {
+  if (currentVisibleData && currentVisibleIsMeasure) {
     const tbody = document.getElementById('table-body')
     if (!tbody) return
 
@@ -702,10 +684,10 @@ function applyFilterGlobal(changedColIdx = null) {
       return f.mode === 'advanced' && f.operator && f.value !== ''
     })
 
-    let totals = Array(window.currentVisibleIsMeasure.length).fill(0)
+    let totals = Array(currentVisibleIsMeasure.length).fill(0)
 
     tbody.querySelectorAll('tr:not(.total-row)').forEach((tr, rowIndex) => {
-      const row = window.currentVisibleData[rowIndex]
+      const row = currentVisibleData[rowIndex]
       const show = filterCols.every(([colIdxStr, f]) => {
         const colIdx = parseInt(colIdxStr)
         if (f.mode === 'multi') {
@@ -715,7 +697,7 @@ function applyFilterGlobal(changedColIdx = null) {
             row[colIdx],
             f.operator,
             f.value,
-            window.currentVisibleIsMeasure[colIdx]
+            currentVisibleIsMeasure[colIdx]
           )
         }
         return true
@@ -724,7 +706,7 @@ function applyFilterGlobal(changedColIdx = null) {
 
       if (show) {
         row.forEach((cell, cIdx) => {
-          if (window.currentVisibleIsMeasure[cIdx]) {
+          if (currentVisibleIsMeasure[cIdx]) {
             const val = Number(cell.toString().replace(/,/g, ''))
             if (!isNaN(val)) totals[cIdx] += val
           }
@@ -732,16 +714,16 @@ function applyFilterGlobal(changedColIdx = null) {
       }
     })
 
-    // Update total row (giữ nguyên)
+    // Update total row
     const totalRow = tbody.querySelector('.total-row')
     if (totalRow) {
       totalRow.innerHTML = ''
       let firstDimHandled = false
-      window.currentVisibleIsMeasure.forEach((isM, cIdx) => {
+      currentVisibleIsMeasure.forEach((isM, cIdx) => {
         if (!isM && !firstDimHandled) {
           const td = document.createElement('td')
           td.textContent = 'Tổng cộng'
-          td.colSpan = window.currentVisibleIsMeasure.filter((v) => !v).length
+          td.colSpan = currentVisibleIsMeasure.filter((v) => !v).length
           td.style.textAlign = 'left'
           totalRow.appendChild(td)
           firstDimHandled = true
@@ -753,51 +735,6 @@ function applyFilterGlobal(changedColIdx = null) {
         }
       })
     }
-
-    // ✅ Fix: Update label cho cột thay đổi (thủ công, không hack click)
-    if (changedColIdx !== null && activeFilters[changedColIdx]) {
-      const filter = activeFilters[changedColIdx]
-      const th = document.querySelector(
-        `#table-filter th:nth-child(${changedColIdx + 1})`
-      ) // nth-child(1) cho col 0
-      if (th) {
-        // Tìm display: th > comboWrapper (div) > display (div đầu tiên)
-        const display = th.querySelector('div > div') // Selector ổn định dựa trên structure
-        if (display) {
-          const arrow = display.querySelector('span') // Giữ arrow nếu có
-          if (filter.mode === 'multi') {
-            // Cho multi: Cần distinct (lấy từ local, nhưng vì global apply, dùng length so sánh với total rows nếu approx)
-            // Để đơn giản (vì multi không gọi global), giữ "(Tất cả)" tạm hoặc skip – nhưng advanced là focus
-            display.textContent = '(Tất cả)' // Fallback, hoặc reload nếu cần
-          } else {
-            // Advanced: Compute như updateDisplayLabel
-            const operatorMap = {
-              '=': '=',
-              '!=': '≠',
-              '>': '>',
-              '<': '<',
-              '>=': '≥',
-              '<=': '≤',
-              contains: 'Chứa',
-              startsWith: 'Bắt đầu',
-              endsWith: 'Kết thúc'
-            }
-            const operatorLabel =
-              operatorMap[filter.operator] || filter.operator
-            const newText = `⚙️ ${operatorLabel} ${filter.value}`
-            display.textContent = newText
-            // Tooltip
-            const colType = window.currentVisibleIsMeasure[changedColIdx]
-              ? 'số'
-              : 'chuỗi'
-            display.title = `Advanced Filter đang áp dụng: ${filter.operator} ${filter.value} (cột ${colType})`
-          }
-          if (arrow) display.appendChild(arrow) // Đảm bảo arrow ở cuối
-        }
-      }
-    }
-  } else {
-    console.error('Global data not loaded!') // Debug
   }
 }
 
