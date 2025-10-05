@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AG Grid Tree Table</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>AG Grid Group Table với Tìm kiếm và Xuất CSV</h1>
+    </div>
+
+    <script>
+      function genData(numRows) {
+        if (numRows <= 0) {
+          return []
+        }
+
+        // Define tree structure variations for generation
+        const treeLv1Options = ['fpt'] // Root
+        const treeLv2Options = ['fis', 'fsoft'] // Sub under fpt
+        const treeLv3Options = {
+          fis: ['fis1', 'fis2', 'fis3', 'fis4'],
+          fsoft: ['fsoft1', 'fsoft2', 'fsoft3', 'fsoft4']
+        }
+        const treeLv4Options = {
+          fis3: ['fis31', 'fis32'] // Only for fis3
+          // Others default to null
+        }
+
+        // Sample data for columns (strings and numbers)
+        const col1Options = [
+          'CNTT1',
+          'CNTT2',
+          'Backend-x1',
+          'Backend-x2',
+          'Backend-x3',
+          'Frontend1',
+          'Frontend2',
+          'Trần Thị B',
+          'Phạm Văn C',
+          'Kinh doanh',
+          'Sales',
+          'Marketing',
+          'DevOps',
+          'QA',
+          'HR',
+          'Finance'
+        ]
+        const col2Options = [12, 15, 18, 20, 25, 30, 8, 10] // Numbers
+        const col3Options = ['A', 'B', 'C', 'D', 'E'] // Simple strings for col3-10
+        const col4Options = [100, 200, 300, 400, 500]
+        const col5Options = [true, false] // Booleans
+        const col6Options = ['2023-01-01', '2023-02-01', '2023-03-01']
+        const col7Options = [1, 2, 3, 4, 5]
+        const col8Options = ['Low', 'Medium', 'High']
+        const col9Options = [0.5, 0.75, 1.0, 1.25]
+        const col10Options = ['Active', 'Inactive', 'Pending']
+
+        const generatedData = []
+        let rowIndex = 0
+
+        // Generate rows by distributing across tree branches
+        while (generatedData.length < numRows && rowIndex < numRows * 2) {
+          // Buffer for variety
+          const lv1 = treeLv1Options[0] // Fixed root
+          const lv2 =
+            treeLv2Options[Math.floor(Math.random() * treeLv2Options.length)]
+          const lv3 =
+            treeLv3Options[lv2][
+              Math.floor(Math.random() * treeLv3Options[lv2].length)
+            ]
+
+          // Lv4: only for fis3, otherwise null
+          let lv4 = null
+          if (lv3 === 'fis3') {
+            lv4 =
+              treeLv4Options['fis3'][
+                Math.floor(Math.random() * treeLv4Options['fis3'].length)
+              ]
+          }
+
+          // Generate row data
+          const row = {
+            tree_lv1: lv1,
+            tree_lv2: lv2,
+            tree_lv3: lv3,
+            tree_lv4: lv4,
+            col1: col1Options[Math.floor(Math.random() * col1Options.length)],
+            col2: col2Options[Math.floor(Math.random() * col2Options.length)],
+            col3: col3Options[Math.floor(Math.random() * col3Options.length)],
+            col4: col4Options[Math.floor(Math.random() * col4Options.length)],
+            col5: col5Options[Math.floor(Math.random() * col5Options.length)],
+            col6: col6Options[Math.floor(Math.random() * col6Options.length)],
+            col7: col7Options[Math.floor(Math.random() * col7Options.length)],
+            col8: col8Options[Math.floor(Math.random() * col8Options.length)],
+            col9: col9Options[Math.floor(Math.random() * col9Options.length)],
+            col10: col10Options[Math.floor(Math.random() * col10Options.length)]
+          }
+
+          generatedData.push(row)
+          rowIndex++
+        }
+
+        // Trim to exact numRows if exceeded
+        return generatedData.slice(0, numRows)
+      }
+
+      // Ví dụ sử dụng: Tạo 15 dòng dữ liệu để test
+      const gendata = genData(15)
+      console.log('gendata', gendata)
+
+      function convertToTreeData(fullData) {
+        if (fullData.length === 0) {
+          return []
+        }
+
+        // Identify tree columns and non-tree columns
+        const firstRow = fullData[0]
+        const treeCols = Object.keys(firstRow)
+          .filter(
+            (key) => key.startsWith('tree_lv') && firstRow[key] !== undefined
+          )
+          .sort((a, b) => {
+            const numA = parseInt(a.match(/(\d+)$/)[1])
+            const numB = parseInt(b.match(/(\d+)$/)[1])
+            return numA - numB
+          })
+
+        const nonTreeCols = Object.keys(firstRow).filter(
+          (key) => !key.startsWith('tree_lv')
+        )
+
+        // Collect unique nodes (id + parent_id pairs) for hierarchy entries with null data
+        const uniqueNodes = new Set()
+        fullData.forEach((row) => {
+          const path = []
+          for (let col of treeCols) {
+            const val = row[col]
+            if (val != null && val !== '' && val !== undefined) {
+              path.push(val)
+            } else {
+              break
+            }
+          }
+          for (let i = 0; i < path.length; i++) {
+            const id = path[i]
+            const parent_id = i > 0 ? path[i - 1] : null
+            uniqueNodes.add(JSON.stringify({ id, parent_id }))
+          }
+        })
+
+        // Create hierarchy node entries with null values for non-tree cols
+        const nodeEntries = []
+        for (let nodeStr of uniqueNodes) {
+          const { id, parent_id } = JSON.parse(nodeStr)
+          const entry = { id, parent_id }
+          nonTreeCols.forEach((col) => {
+            entry[col] = null
+          })
+          nodeEntries.push(entry)
+        }
+
+        // Create data entries for each original row, attached to the deepest level
+        const dataEntries = []
+        fullData.forEach((row) => {
+          const path = []
+          for (let col of treeCols) {
+            const val = row[col]
+            if (val != null && val !== '' && val !== undefined) {
+              path.push(val)
+            } else {
+              break
+            }
+          }
+          if (path.length === 0) {
+            return // Skip rows with no path
+          }
+          const deepestId = path[path.length - 1]
+          const deepestParent = path.length > 1 ? path[path.length - 2] : null
+          const entry = { id: deepestId, parent_id: deepestParent }
+          nonTreeCols.forEach((col) => {
+            entry[col] = row[col]
+          })
+          dataEntries.push(entry)
+        })
+
+        // Combine: hierarchy nodes first, then data entries
+        return [...nodeEntries, ...dataEntries]
+      }
+
+      // Example usage with provided data (note: adjusted input data to match output example assuming 'CNTT2' was intended)
+      //   const fullData = [
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis1',
+      //       tree_lv4: null,
+      //       col1: 'CNTT1',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis1',
+      //       tree_lv4: null,
+      //       col1: 'CNTT2',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis2',
+      //       tree_lv4: null,
+      //       col1: 'Backend-x1',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis2',
+      //       tree_lv4: null,
+      //       col1: 'Backend-x2',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis2',
+      //       tree_lv4: null,
+      //       col1: 'Backend-x3',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis3',
+      //       tree_lv4: 'fis31',
+      //       col1: 'Frontend1',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis3',
+      //       tree_lv4: 'fis32',
+      //       col1: 'Frontend2',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fis',
+      //       tree_lv3: 'fis4',
+      //       tree_lv4: null,
+      //       col1: 'Trần Thị B',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fsoft',
+      //       tree_lv3: 'fsoft1',
+      //       tree_lv4: null,
+      //       col1: 'Phạm Văn C',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fsoft',
+      //       tree_lv3: 'fsoft2',
+      //       tree_lv4: null,
+      //       col1: 'Kinh doanh',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fsoft',
+      //       tree_lv3: 'fsoft3',
+      //       tree_lv4: null,
+      //       col1: 'Sales',
+      //       col2: 12
+      //     },
+      //     {
+      //       tree_lv1: 'fpt',
+      //       tree_lv2: 'fsoft',
+      //       tree_lv3: 'fsoft4',
+      //       tree_lv4: null,
+      //       col1: 'Marketing',
+      //       col2: 12
+      //     }
+      //   ]
+
+      const fullData = gendata
+
+      const convertData = convertToTreeData(fullData)
+      console.log(convertData)
+    </script>
+  </body>
+</html>

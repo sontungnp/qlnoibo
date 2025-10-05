@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AG Grid TreeView - Auto Generated Tree Data</title>
+
+    <!-- AG Grid Community -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css"
+    />
+
+    <style>
+      html,
+      body,
+      #myGrid {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+      }
+
+      .tree-cell {
+        display: flex;
+        align-items: center;
+      }
+
+      .tree-indent {
+        display: inline-block;
+      }
+
+      .tree-toggle {
+        cursor: pointer;
+        font-weight: bold;
+        margin-right: 6px;
+        user-select: none;
+        color: #0066cc;
+        width: 16px;
+        text-align: center;
+      }
+
+      .tree-icon {
+        margin-right: 6px;
+      }
+
+      .icon-company {
+        color: #2d7dd2;
+      }
+      .icon-department {
+        color: #21a179;
+      }
+      .icon-team {
+        color: #e0a800;
+      }
+      .icon-employee {
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="myGrid" class="ag-theme-alpine"></div>
+
+    <script>
+      // 🧩 Sinh dữ liệu cây động
+      function generateTreeData(levels = 3, childrenPerNode = 3, startId = 1) {
+        let idCounter = startId
+
+        function createNode(level, parentId = null, type = 'Company') {
+          const types = ['Company', 'Department', 'Team', 'Employee']
+          const node = {
+            id: idCounter++,
+            parent: parentId,
+            name: `${type}-${idCounter}`,
+            type: types[level - 1] || 'Employee',
+            age: 20 + Math.floor(Math.random() * 30),
+            address: `Số ${Math.floor(
+              Math.random() * 200
+            )} Đường ${String.fromCharCode(
+              65 + Math.floor(Math.random() * 26)
+            )}`,
+            expanded: level < levels // mặc định mở trừ tầng cuối
+          }
+
+          if (level < levels) {
+            for (let i = 0; i < childrenPerNode; i++) {
+              createNode(level + 1, node.id, types[level])
+            }
+          }
+
+          flatData.push(node)
+          return node
+        }
+
+        const flatData = []
+        for (let i = 0; i < childrenPerNode; i++) {
+          createNode(1, null)
+        }
+
+        return flatData
+      }
+
+      // 🔹 Build danh sách hiển thị dựa trên các node đang mở
+      function buildVisibleRows(data, parent = null, level = 0) {
+        const rows = []
+        data
+          .filter((item) => item.parent === parent)
+          .forEach((item) => {
+            rows.push({ ...item, level })
+            if (item.expanded) {
+              rows.push(...buildVisibleRows(data, item.id, level + 1))
+            }
+          })
+        return rows
+      }
+
+      let gridApi
+      let fullData = generateTreeData(2, 2) // 3 cấp, mỗi node có 3 con
+
+      console.log('fullData', fullData)
+
+      console.log('buildVisibleRows(fullData)', buildVisibleRows(fullData))
+
+      // 🔹 Toggle node
+      function toggleNode(id) {
+        const node = fullData.find((n) => n.id === id)
+        if (!node) return
+        node.expanded = !node.expanded
+        const newVisible = buildVisibleRows(fullData)
+        if (gridApi) gridApi.setGridOption('rowData', newVisible)
+      }
+
+      // 🔹 Icon hiển thị
+      function getIcon(type) {
+        switch (type) {
+          case 'Company':
+            return '🏢'
+          case 'Department':
+            return '🏬'
+          case 'Team':
+            return '👥'
+          case 'Employee':
+            return '👤'
+          default:
+            return '📁'
+        }
+      }
+
+      // 🔹 Renderer cho tree
+      function treeRenderer(params) {
+        const eDiv = document.createElement('div')
+        eDiv.classList.add('tree-cell')
+
+        // indent theo cấp
+        const indent = document.createElement('span')
+        indent.classList.add('tree-indent')
+        indent.style.width = params.data.level * 20 + 'px'
+        eDiv.appendChild(indent)
+
+        const hasChildren = fullData.some((d) => d.parent === params.data.id)
+
+        const toggle = document.createElement('span')
+        toggle.classList.add('tree-toggle')
+        if (hasChildren) {
+          toggle.textContent = params.data.expanded ? '−' : '+'
+          toggle.onclick = () => toggleNode(params.data.id)
+        } else {
+          toggle.textContent = ''
+        }
+        eDiv.appendChild(toggle)
+
+        const nodeIcon = document.createElement('span')
+        nodeIcon.classList.add(
+          'tree-icon',
+          `icon-${params.data.type.toLowerCase()}`
+        )
+        nodeIcon.textContent = getIcon(params.data.type)
+        eDiv.appendChild(nodeIcon)
+
+        const label = document.createElement('span')
+        label.textContent = params.value
+        eDiv.appendChild(label)
+
+        return eDiv
+      }
+
+      // 🔹 Cấu hình AG Grid
+      const gridOptions = {
+        theme: 'legacy',
+        columnDefs: [
+          {
+            field: 'name',
+            headerName: 'Tên / Cấu trúc tổ chức',
+            flex: 2,
+            cellRenderer: treeRenderer
+          },
+          { field: 'type', headerName: 'Loại', flex: 1 },
+          { field: 'age', headerName: 'Tuổi', flex: 1 },
+          { field: 'address', headerName: 'Địa chỉ', flex: 2 }
+        ],
+        defaultColDef: {
+          resizable: true,
+          sortable: true
+        },
+        rowData: buildVisibleRows(fullData),
+        animateRows: true
+      }
+
+      const gridDiv = document.querySelector('#myGrid')
+      gridApi = agGrid.createGrid(gridDiv, gridOptions)
+    </script>
+  </body>
+</html>

@@ -53,19 +53,23 @@ function normalizeUnicode(str) {
 
 document.addEventListener('DOMContentLoaded', () => {
   tableau.extensions.initializeAsync().then(() => {
+    console.log('x1')
+
     const dashboard = tableau.extensions.dashboardContent.dashboard
     const worksheet = dashboard.worksheets[0] // Assumes the first worksheet; adjust if needed
-    worksheet
-      .getSummaryDataAsync({ ignoreSelection: true })
-      .then((dataTable) => {
-        processAndDisplayData(dataTable, worksheet)
-      })
+    console.log('worksheet', worksheet)
+    worksheet.getSummaryDataAsync({ maxRows: 0 }).then((dataTable) => {
+      console.log('dataTable', dataTable)
+      processAndDisplayData(dataTable, worksheet)
+    })
   })
 })
 
 function processAndDisplayData(dataTable, worksheet) {
   let columns = dataTable.columns
   let data = dataTable.data
+
+  console.log('data', data)
 
   // Step 2: Filter out columns starting with 'hidden'
   const hiddenPrefix = 'hidden'.toLowerCase()
@@ -152,6 +156,8 @@ function processAndDisplayData(dataTable, worksheet) {
     { fieldName: 'Hierarchy' },
     ...valueIndices.map((i) => pivotedColumns[i])
   ]
+
+  console.log('tableColumns', tableColumns)
 
   // Build tree structure
   root = {
@@ -269,9 +275,22 @@ function processAndDisplayData(dataTable, worksheet) {
     tdName.appendChild(document.createTextNode(node.name))
     tr.appendChild(tdName)
     if (node.data) {
-      node.data.forEach((d) => {
+      node.data.forEach((d, j) => {
         let td = document.createElement('td')
-        td.textContent = d.formattedValue || d.value || ''
+
+        // Nếu cột là measure thì format số & căn phải
+        if (measureIndices.includes(valueIndices[j])) {
+          let val = parseFloat(d.value)
+          if (!isNaN(val)) {
+            td.textContent = val.toLocaleString('en-US') // format số
+          } else {
+            td.textContent = d.formattedValue || d.value || ''
+          }
+          td.classList.add('number-cell') // thêm class căn phải
+        } else {
+          td.textContent = d.formattedValue || d.value || ''
+        }
+
         tr.appendChild(td)
       })
     } else {
@@ -289,6 +308,8 @@ function processAndDisplayData(dataTable, worksheet) {
     node.children.forEach((child) => renderNode(child, node))
   }
   root.children.forEach((child) => renderNode(child, root))
+
+  adjustColumnWidthsBasedOnData()
 
   // Sau khi render xong, tính toán và cập nhật sticky positions
   // updateStickyPositions()
@@ -329,6 +350,102 @@ function processAndDisplayData(dataTable, worksheet) {
       node.row.style.display = 'none'
     }
     return matches
+  }
+}
+
+// === adjust column widths using ALL nodes (including collapsed) - Approach 1 ===
+function adjustColumnWidthsBasedOnData() {
+  const table = document.getElementById('dataTable')
+  const headerRow = table.querySelector('thead tr:first-child')
+  if (!headerRow) return
+  const cols = headerRow.cells.length
+
+  // collect unique texts per column to avoid duplicate measurements (Set)
+  const textsByCol = Array.from({ length: cols }, () => new Set())
+
+  // add header text
+  Array.from(headerRow.cells).forEach((th, i) =>
+    textsByCol[i].add((th.innerText || '').trim())
+  )
+
+  // add filter row text (nếu có)
+  const filterRow = table.querySelector('thead tr:nth-child(2)')
+  if (filterRow) {
+    Array.from(filterRow.cells).forEach((th, i) =>
+      textsByCol[i].add((th.innerText || '').trim())
+    )
+  }
+
+  // traverse tree data model (root) to collect every node's displayed values
+  function traverse(node) {
+    // column 0: hierarchy name
+    textsByCol[0].add(node.name || '')
+
+    // other columns: node.data is array of { value, formattedValue } or empty
+    if (node.data) {
+      node.data.forEach((d, j) => {
+        const colIdx = j + 1 // because col 0 is Hierarchy
+        textsByCol[colIdx].add(String(d.formattedValue ?? d.value ?? ''))
+      })
+    } else {
+      // if node has no data, still ensure entry (empty string)
+      for (let k = 1; k < cols; k++) textsByCol[k].add('')
+    }
+
+    node.children.forEach(traverse)
+  }
+  root.children.forEach(traverse)
+
+  // compute max depth (for indent width)
+  function getMaxLevel(node) {
+    let max = node.level || 0
+    for (const c of node.children) {
+      max = Math.max(max, getMaxLevel(c))
+    }
+    return max
+  }
+  const maxLevel = getMaxLevel(root)
+
+  // measure unique texts using a hidden span (faster than many elements)
+  const tmp = document.createElement('span')
+  tmp.style.visibility = 'hidden'
+  tmp.style.position = 'absolute'
+  tmp.style.whiteSpace = 'nowrap'
+  tmp.style.font = window.getComputedStyle(table).font // try to match font
+  document.body.appendChild(tmp)
+
+  const colWidths = new Array(cols).fill(30) // start with min 30
+
+  const MAX_MEASURE_TEXTS = 1000 // safety cap per column (tùy chỉnh nếu cần)
+  for (let i = 0; i < cols; i++) {
+    let count = 0
+    for (const txt of textsByCol[i]) {
+      tmp.innerText = txt || ''
+      let w = tmp.offsetWidth + 20 // add padding buffer
+      if (w > colWidths[i]) colWidths[i] = w
+      count++
+      if (count >= MAX_MEASURE_TEXTS) break
+    }
+    // for hierarchy column, add indent + expander width
+    if (i === 0) {
+      colWidths[i] += maxLevel * 20 + 24
+    }
+    if (colWidths[i] > 300) colWidths[i] = 300
+    if (colWidths[i] < 30) colWidths[i] = 30
+  }
+
+  document.body.removeChild(tmp)
+
+  // apply widths to all header and body cells
+  for (let i = 0; i < cols; i++) {
+    const nodes = table.querySelectorAll(
+      `tr td:nth-child(${i + 1}), tr th:nth-child(${i + 1})`
+    )
+    nodes.forEach((cell) => {
+      cell.style.width = colWidths[i] + 'px'
+      // allow wrap
+      cell.style.whiteSpace = 'normal'
+    })
   }
 }
 

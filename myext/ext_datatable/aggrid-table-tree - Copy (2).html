@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AG Grid TreeView - Auto Generated Tree Data</title>
+
+    <!-- AG Grid Community -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css"
+    />
+
+    <style>
+      html,
+      body,
+      #myGrid {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+      }
+
+      .tree-cell {
+        display: flex;
+        align-items: center;
+      }
+
+      .tree-indent {
+        display: inline-block;
+      }
+
+      .tree-toggle {
+        cursor: pointer;
+        font-weight: bold;
+        margin-right: 6px;
+        user-select: none;
+        color: #0066cc;
+        width: 16px;
+        text-align: center;
+      }
+
+      .tree-icon {
+        margin-right: 6px;
+      }
+
+      .icon-company {
+        color: #2d7dd2;
+      }
+      .icon-department {
+        color: #21a179;
+      }
+      .icon-team {
+        color: #e0a800;
+      }
+      .icon-employee {
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="myGrid" class="ag-theme-alpine"></div>
+
+    <script>
+      // 🧩 Sinh dữ liệu cây động
+
+      function genData(numRows) {
+        if (numRows <= 0) {
+          return []
+        }
+
+        // Define tree structure variations for generation
+        const treeLv1Options = ['fpt'] // Root
+        const treeLv2Options = ['fis', 'fsoft'] // Sub under fpt
+        const treeLv3Options = {
+          fis: ['fis1', 'fis2', 'fis3', 'fis4'],
+          fsoft: ['fsoft1', 'fsoft2', 'fsoft3', 'fsoft4']
+        }
+        const treeLv4Options = {
+          fis3: ['fis31', 'fis32'] // Only for fis3
+          // Others default to null
+        }
+
+        // Sample data for columns (strings and numbers)
+        const col1Options = [
+          'CNTT1',
+          'CNTT2',
+          'Backend-x1',
+          'Backend-x2',
+          'Backend-x3',
+          'Frontend1',
+          'Frontend2',
+          'Trần Thị B',
+          'Phạm Văn C',
+          'Kinh doanh',
+          'Sales',
+          'Marketing',
+          'DevOps',
+          'QA',
+          'HR',
+          'Finance'
+        ]
+        const col2Options = [12, 15, 18, 20, 25, 30, 8, 10] // Numbers
+        const col3Options = ['A', 'B', 'C', 'D', 'E'] // Simple strings for col3-10
+        const col4Options = [100, 200, 300, 400, 500]
+        const col5Options = [true, false] // Booleans
+        const col6Options = ['2023-01-01', '2023-02-01', '2023-03-01']
+        const col7Options = [1, 2, 3, 4, 5]
+        const col8Options = ['Low', 'Medium', 'High']
+        const col9Options = [0.5, 0.75, 1.0, 1.25]
+        const col10Options = ['Active', 'Inactive', 'Pending']
+
+        const generatedData = []
+        let rowIndex = 0
+
+        // Generate rows by distributing across tree branches
+        while (generatedData.length < numRows && rowIndex < numRows * 2) {
+          // Buffer for variety
+          const lv1 = treeLv1Options[0] // Fixed root
+          const lv2 =
+            treeLv2Options[Math.floor(Math.random() * treeLv2Options.length)]
+          const lv3 =
+            treeLv3Options[lv2][
+              Math.floor(Math.random() * treeLv3Options[lv2].length)
+            ]
+
+          // Lv4: only for fis3, otherwise null
+          let lv4 = null
+          if (lv3 === 'fis3') {
+            lv4 =
+              treeLv4Options['fis3'][
+                Math.floor(Math.random() * treeLv4Options['fis3'].length)
+              ]
+          }
+
+          // Generate row data
+          const row = {
+            tree_lv1: lv1,
+            tree_lv2: lv2,
+            tree_lv3: lv3,
+            tree_lv4: lv4,
+            col1: col1Options[Math.floor(Math.random() * col1Options.length)],
+            col2: col2Options[Math.floor(Math.random() * col2Options.length)],
+            col3: col3Options[Math.floor(Math.random() * col3Options.length)],
+            col4: col4Options[Math.floor(Math.random() * col4Options.length)],
+            col5: col5Options[Math.floor(Math.random() * col5Options.length)],
+            col6: col6Options[Math.floor(Math.random() * col6Options.length)],
+            col7: col7Options[Math.floor(Math.random() * col7Options.length)],
+            col8: col8Options[Math.floor(Math.random() * col8Options.length)],
+            col9: col9Options[Math.floor(Math.random() * col9Options.length)],
+            col10: col10Options[Math.floor(Math.random() * col10Options.length)]
+          }
+
+          generatedData.push(row)
+          rowIndex++
+        }
+
+        // Trim to exact numRows if exceeded
+        return generatedData.slice(0, numRows)
+      }
+
+      function convertToTreeData(fullData) {
+        if (fullData.length === 0) {
+          return []
+        }
+
+        const firstRow = fullData[0]
+        const treeCols = Object.keys(firstRow)
+          .filter(
+            (key) => key.startsWith('tree_lv') && firstRow[key] !== undefined
+          )
+          .sort((a, b) => {
+            const numA = parseInt(a.match(/(\d+)$/)[1])
+            const numB = parseInt(b.match(/(\d+)$/)[1])
+            return numA - numB
+          })
+
+        const nonTreeCols = Object.keys(firstRow).filter(
+          (key) => !key.startsWith('tree_lv')
+        )
+
+        const uniqueNodes = new Set()
+        fullData.forEach((row) => {
+          const path = []
+          for (let col of treeCols) {
+            const val = row[col]
+            if (val != null && val !== '' && val !== undefined) {
+              path.push(val)
+            } else {
+              break
+            }
+          }
+          for (let i = 0; i < path.length; i++) {
+            const id = path[i]
+            const parent = i > 0 ? path[i - 1] : null
+            uniqueNodes.add(JSON.stringify({ id, parent }))
+          }
+        })
+
+        // 🔹 Tạo hierarchy node entries
+        const nodeEntries = []
+        for (let nodeStr of uniqueNodes) {
+          const { id, parent } = JSON.parse(nodeStr)
+          const entry = { id, parent }
+          nonTreeCols.forEach((col) => {
+            entry[col] = null
+          })
+          entry.type = 'Department' // ✅ thêm cứng type
+          nodeEntries.push(entry)
+        }
+
+        // 🔹 Tạo data entries cho từng hàng
+        const dataEntries = []
+        fullData.forEach((row) => {
+          const path = []
+          for (let col of treeCols) {
+            const val = row[col]
+            if (val != null && val !== '' && val !== undefined) {
+              path.push(val)
+            } else {
+              break
+            }
+          }
+          if (path.length === 0) return
+
+          const deepestId = path[path.length - 1]
+          const deepestParent = path.length > 1 ? path[path.length - 2] : null
+          const entry = { id: deepestId, parent: deepestParent }
+          nonTreeCols.forEach((col) => {
+            entry[col] = row[col]
+          })
+          entry.type = 'Department' // ✅ thêm cứng type cho data luôn
+          dataEntries.push(entry)
+        })
+
+        return [...nodeEntries, ...dataEntries]
+      }
+
+      // 🔹 Build danh sách hiển thị dựa trên các node đang mở
+      function buildVisibleRows(data, parent = null, level = 0) {
+        const rows = []
+        data
+          .filter((item) => item.parent === parent)
+          .forEach((item) => {
+            rows.push({ ...item, level })
+            if (item.expanded) {
+              rows.push(...buildVisibleRows(data, item.id, level + 1))
+            }
+          })
+        return rows
+      }
+
+      let gridApi
+
+      // Ví dụ sử dụng: Tạo 15 dòng dữ liệu để test
+      let fullData = convertToTreeData(genData(15))
+      console.log('fullData', fullData)
+      console.log(JSON.stringify(fullData))
+
+      // 🔹 Toggle node
+      function toggleNode(id) {
+        const node = fullData.find((n) => n.id === id)
+        if (!node) return
+        node.expanded = !node.expanded
+        const newVisible = buildVisibleRows(fullData)
+        if (gridApi) gridApi.setGridOption('rowData', newVisible)
+      }
+
+      // 🔹 Icon hiển thị
+      function getIcon(type) {
+        switch (type) {
+          case 'Company':
+            return '🏢'
+          case 'Department':
+            return '🏬'
+          case 'Team':
+            return '👥'
+          case 'Employee':
+            return '👤'
+          default:
+            return '📁'
+        }
+      }
+
+      // 🔹 Renderer cho tree
+      function treeRenderer(params) {
+        const eDiv = document.createElement('div')
+        eDiv.classList.add('tree-cell')
+
+        // indent theo cấp
+        const indent = document.createElement('span')
+        indent.classList.add('tree-indent')
+        indent.style.width = params.data.level * 20 + 'px'
+        eDiv.appendChild(indent)
+
+        const hasChildren = fullData.some((d) => d.parent === params.data.id)
+
+        const toggle = document.createElement('span')
+        toggle.classList.add('tree-toggle')
+        if (hasChildren) {
+          toggle.textContent = params.data.expanded ? '−' : '+'
+          toggle.onclick = () => toggleNode(params.data.id)
+        } else {
+          toggle.textContent = ''
+        }
+        eDiv.appendChild(toggle)
+
+        const nodeIcon = document.createElement('span')
+        nodeIcon.classList.add(
+          'tree-icon',
+          `icon-${params.data.type.toLowerCase()}`
+        )
+        nodeIcon.textContent = getIcon(params.data.type)
+        eDiv.appendChild(nodeIcon)
+
+        const label = document.createElement('span')
+        label.textContent = params.value
+        eDiv.appendChild(label)
+
+        return eDiv
+      }
+
+      // 🔹 Cấu hình AG Grid
+      const gridOptions = {
+        theme: 'legacy',
+        columnDefs: [
+          {
+            field: 'id',
+            headerName: 'Tên / Cấu trúc tổ chức',
+            flex: 2,
+            cellRenderer: treeRenderer
+          },
+          { field: 'col1', headerName: 'col1', flex: 1 },
+          { field: 'col2', headerName: 'col2', flex: 1 },
+          { field: 'col3', headerName: 'col3', flex: 2 }
+        ],
+        defaultColDef: {
+          resizable: true,
+          sortable: true
+        },
+        rowData: buildVisibleRows(fullData),
+        animateRows: true
+      }
+
+      const gridDiv = document.querySelector('#myGrid')
+      gridApi = agGrid.createGrid(gridDiv, gridOptions)
+    </script>
+  </body>
+</html>

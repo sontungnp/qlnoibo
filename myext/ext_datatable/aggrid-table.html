@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AG Grid - Hiệu năng hiển thị dữ liệu lớn</title>
+
+    <!-- AG Grid Community -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f5f6fa;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 10px;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      #myGrid {
+        flex: 1;
+        width: 100%;
+      }
+      .footer {
+        position: sticky;
+        bottom: 0;
+        background-color: #f0f0f0;
+        font-weight: bold;
+        border-top: 2px solid #ccc;
+        padding: 8px;
+        text-align: right;
+      }
+      .search-box {
+        padding: 5px;
+        width: 250px;
+        border-radius: 4px;
+        border: 1px solid #aaa;
+      }
+      button {
+        padding: 6px 12px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-left: 5px;
+      }
+      button:hover {
+        background-color: #2980b9;
+      }
+      .controls {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+      input[type='number'] {
+        width: 80px;
+        padding: 4px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="toolbar">
+        <div class="controls">
+          <input type="number" id="rowCount" value="5000" min="1" step="1000" />
+          <button id="generateBtn">Tạo dữ liệu</button>
+          <input
+            type="text"
+            id="searchBox"
+            class="search-box"
+            placeholder="Tìm kiếm..."
+          />
+        </div>
+        <button id="exportBtn">Xuất Excel</button>
+        <button id="copyBtn">Copy Selected Rows</button>
+      </div>
+
+      <div id="myGrid" class="ag-theme-alpine"></div>
+      <div id="footerRow" class="footer">Tổng cộng sẽ hiển thị ở đây</div>
+    </div>
+
+    <script>
+      // ======= 1️⃣ CẤU HÌNH CỘT =======
+      const columnDefs = [
+        { field: 'id', headerName: 'ID', width: 90 },
+        { field: 'name', headerName: 'Tên nhân viên', width: 180 },
+        { field: 'department', headerName: 'Phòng ban', width: 140 },
+        {
+          field: 'salary',
+          headerName: 'Lương',
+          width: 120,
+          type: 'numericColumn'
+        },
+        {
+          field: 'bonus',
+          headerName: 'Thưởng',
+          width: 120,
+          type: 'numericColumn'
+        }
+      ]
+
+      // ======= 2️⃣ HÀM SINH DỮ LIỆU NGẪU NHIÊN =======
+      function generateData(rowCount = 1000) {
+        const departments = [
+          'IT',
+          'Kế toán',
+          'Marketing',
+          'Nhân sự',
+          'Kinh doanh',
+          'Pháp chế'
+        ]
+        const data = []
+
+        for (let i = 1; i <= rowCount; i++) {
+          const name = `Nhân viên ${i}`
+          const department =
+            departments[Math.floor(Math.random() * departments.length)]
+          const salary = Math.floor(1000 + Math.random() * 5000)
+          const bonus = Math.floor(50 + Math.random() * 500)
+          data.push({ id: i, name, department, salary, bonus })
+        }
+
+        return data
+      }
+
+      // ======= 3️⃣ TÍNH TỔNG =======
+      function calcTotals(data, numericCols) {
+        const totals = {}
+        numericCols.forEach((col) => {
+          totals[col] = data.reduce(
+            (sum, row) => sum + (Number(row[col]) || 0),
+            0
+          )
+        })
+        return totals
+      }
+
+      let pdata = generateData(100)
+      console.log('pdata', pdata)
+
+      // ======= 4️⃣ CẤU HÌNH GRID =======
+      const gridOptions = {
+        theme: 'legacy',
+        columnDefs,
+        rowData: pdata,
+        animateRows: true,
+        defaultColDef: {
+          sortable: true,
+          filter: true,
+          resizable: true
+        },
+        rowSelection: {
+          mode: 'multiRow',
+          checkboxes: true
+        },
+
+        onRowClicked: (event) => {
+          // Bỏ chọn tất cả dòng khác
+          gridApi.deselectAll()
+          // Chọn dòng hiện tại
+          event.node.setSelected(true)
+        },
+
+        domLayout: 'normal',
+        onGridReady: () => updateFooterTotals(),
+        onFilterChanged: () => updateFooterTotals(),
+        onSortChanged: () => updateFooterTotals()
+      }
+
+      const eGridDiv = document.querySelector('#myGrid')
+      const gridApi = agGrid.createGrid(eGridDiv, gridOptions)
+
+      // ======= 5️⃣ TÌM KIẾM =======
+      document
+        .getElementById('searchBox')
+        .addEventListener('input', function () {
+          gridApi.setGridOption('quickFilterText', this.value)
+          updateFooterTotals()
+        })
+
+      // ======= 6️⃣ EXPORT EXCEL =======
+      document
+        .getElementById('exportBtn')
+        .addEventListener('click', function () {
+          gridApi.exportDataAsCsv({
+            fileName: 'data_export.csv'
+          })
+        })
+
+      // ======= 7️⃣ DÒNG TỔNG =======
+      function updateFooterTotals() {
+        const allData = []
+        gridApi.forEachNodeAfterFilterAndSort((node) => allData.push(node.data))
+
+        const numericCols = columnDefs
+          .filter((col) => col.type === 'numericColumn')
+          .map((col) => col.field)
+
+        const totals = calcTotals(allData, numericCols)
+
+        let footerHtml = 'Tổng cộng: '
+        numericCols.forEach((col) => {
+          footerHtml += `${col}: <b>${totals[
+            col
+          ].toLocaleString()}</b> &nbsp;&nbsp;`
+        })
+        document.getElementById('footerRow').innerHTML = footerHtml
+      }
+
+      // ======= 8️⃣ NÚT TẠO DỮ LIỆU =======
+      document.getElementById('generateBtn').addEventListener('click', () => {
+        const count =
+          parseInt(document.getElementById('rowCount').value) || 1000
+        const newData = generateData(count)
+        gridApi.setGridOption('rowData', newData)
+        updateFooterTotals()
+      })
+
+      document.getElementById('copyBtn').addEventListener('click', () => {
+        const selectedNodes = []
+        gridApi.forEachNode((node) => {
+          if (node.isSelected()) selectedNodes.push(node)
+        })
+
+        if (selectedNodes.length === 0) {
+          alert('Chưa chọn dòng nào!')
+          return
+        }
+        const selectedData = selectedNodes.map((node) => node.data)
+        const text = selectedData
+          .map((row) => Object.values(row).join('\t'))
+          .join('\n')
+
+        navigator.clipboard.writeText(text).then(() => {
+          alert(`Đã copy ${selectedData.length} dòng vào clipboard!`)
+        })
+      })
+    </script>
+  </body>
+</html>

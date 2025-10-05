@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AG Grid TreeView - Community Edition</title>
+
+    <!-- AG Grid Community -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-quartz.css"
+    />
+
+    <style>
+      body {
+        margin: 20px;
+        font-family: sans-serif;
+      }
+      #gridContainer {
+        height: 600px;
+        width: 100%;
+      }
+      .toolbar {
+        margin-bottom: 10px;
+      }
+      input,
+      button {
+        padding: 6px 10px;
+        margin-right: 10px;
+      }
+      .tree-indent {
+        display: inline-block;
+        width: 18px;
+      }
+      .toggle-btn {
+        cursor: pointer;
+        font-weight: bold;
+        color: #0078d7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      🔍
+      <input type="text" id="globalSearch" placeholder="Tìm kiếm toàn bộ..." />
+      <button id="exportExcel">📤 Export CSV</button>
+      <button id="copyRow">📋 Copy dòng được chọn</button>
+    </div>
+
+    <div id="gridContainer" class="ag-theme-quartz"></div>
+
+    <script>
+      // ======================
+      // 1️⃣ Dữ liệu gốc
+      // ======================
+      const fullData = [
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fis',
+          tree_lv3: 'fis1',
+          col1: 'nguyen12',
+          col2: 'CNTT1',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fis',
+          tree_lv3: 'fis1',
+          col1: 'nguyen13',
+          col2: 'CNTT2',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fis',
+          tree_lv3: 'fis2',
+          col1: 'nguyen14',
+          col2: 'Backend1',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fis',
+          tree_lv3: 'fis2',
+          col1: 'nguyen15',
+          col2: 'Backend2',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fsoft',
+          tree_lv3: 'fsoft1',
+          col1: 'nguyen151',
+          col2: 'Backd23',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fsoft',
+          tree_lv3: 'fsoft1',
+          col1: 'nguyen152',
+          col2: 'Bked24',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fsoft',
+          tree_lv3: 'fsoft1',
+          col1: 'dfadsa',
+          col2: 'dfdsafds',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fsoft',
+          tree_lv3: 'fsoft2',
+          col1: 'nguyen151',
+          col2: 'Backd23',
+          col3: 'abdsf dsfsd'
+        },
+        {
+          tree_lv1: 'fpt',
+          tree_lv2: 'fsoft',
+          tree_lv3: 'fsoft2',
+          col1: 'nguyen152',
+          col2: 'Bked24',
+          col3: 'abdsf dsfsd'
+        }
+      ]
+
+      // ======================
+      // 2️⃣ Hàm tạo dữ liệu tree
+      // ======================
+      let idCounter = 0
+      function buildTree(data) {
+        const rootMap = {}
+        for (const row of data) {
+          if (!rootMap[row.tree_lv1]) {
+            rootMap[row.tree_lv1] = {
+              id: ++idCounter,
+              name: row.tree_lv1,
+              level: 1,
+              expanded: false,
+              leaf: false,
+              children: {}
+            }
+          }
+
+          const lv1 = rootMap[row.tree_lv1]
+          if (!lv1.children[row.tree_lv2]) {
+            lv1.children[row.tree_lv2] = {
+              id: ++idCounter,
+              name: row.tree_lv2,
+              level: 2,
+              expanded: false,
+              leaf: false,
+              children: {}
+            }
+          }
+
+          const lv2 = lv1.children[row.tree_lv2]
+          if (!lv2.children[row.tree_lv3]) {
+            lv2.children[row.tree_lv3] = {
+              id: ++idCounter,
+              name: row.tree_lv3,
+              level: 3,
+              expanded: false,
+              leaf: false,
+              children: []
+            }
+          }
+
+          const lv3 = lv2.children[row.tree_lv3]
+          lv3.children.push({
+            id: ++idCounter,
+            name: null,
+            level: 4,
+            leaf: true,
+            col1: row.col1,
+            col2: row.col2,
+            col3: row.col3
+          })
+        }
+
+        // convert children {} => []
+        return Object.values(rootMap).map((n) => normalizeTree(n))
+      }
+
+      function normalizeTree(node) {
+        if (node.children && !Array.isArray(node.children)) {
+          node.children = Object.values(node.children).map((n) =>
+            normalizeTree(n)
+          )
+        }
+        return node
+      }
+
+      // ======================
+      // 3️⃣ Flatten tree (để hiển thị)
+      // ======================
+      function flattenTree(nodes) {
+        let result = []
+        for (const n of nodes) {
+          result.push(n)
+          if (n.expanded && n.children) {
+            result = result.concat(flattenTree(n.children))
+          }
+        }
+        return result
+      }
+
+      // ======================
+      // 4️⃣ Tree data + Flatten ban đầu
+      // ======================
+      const nestedData = buildTree(fullData)
+      let flatData = flattenTree(nestedData)
+
+      console.log('fullData', fullData)
+      console.log('nestedData', nestedData)
+      console.log('flatData', flatData)
+
+      // ======================
+      // 5️⃣ Cột hiển thị
+      // ======================
+      const columnDefs = [
+        {
+          headerName: 'Cấu trúc cây',
+          field: 'name',
+          flex: 2,
+          cellRenderer: (params) => {
+            const node = params.data
+            if (!node) return ''
+
+            const indent = '<span class="tree-indent"></span>'.repeat(
+              node.level - 1
+            )
+            if (node.leaf) {
+              return indent + '📄 ' + (node.name || '')
+            } else {
+              const symbol = node.expanded ? '➖' : '➕'
+              return (
+                indent +
+                `<span class="toggle-btn" data-id="${node.id}">${symbol}</span> 📁 ` +
+                node.name
+              )
+            }
+          }
+        },
+        { field: 'col1', headerName: 'Cột 1', flex: 1 },
+        { field: 'col2', headerName: 'Cột 2', flex: 1 },
+        { field: 'col3', headerName: 'Cột 3', flex: 1 }
+      ]
+
+      // ======================
+      // 6️⃣ Cấu hình AG Grid
+      // ======================
+      const gridOptions = {
+        columnDefs,
+        rowData: flatData,
+        defaultColDef: {
+          filter: true,
+          sortable: true,
+          resizable: true
+        },
+        rowSelection: 'multiple',
+        suppressRowClickSelection: false,
+        onCellClicked: (params) => {
+          const el = params.event.target
+          if (el.classList.contains('toggle-btn')) {
+            toggleNode(el.dataset.id)
+          }
+        }
+      }
+
+      const eGridDiv = document.getElementById('gridContainer')
+      const gridApi = agGrid.createGrid(eGridDiv, gridOptions)
+
+      // ======================
+      // 7️⃣ Toggle expand/collapse
+      // ======================
+      function toggleNode(nodeId) {
+        function recursiveToggle(nodes) {
+          for (const n of nodes) {
+            if (n.id == nodeId) {
+              n.expanded = !n.expanded
+              break
+            }
+            if (n.children) recursiveToggle(n.children)
+          }
+        }
+        recursiveToggle(nestedData)
+        flatData = flattenTree(nestedData)
+        gridApi.setGridOption('rowData', flatData)
+      }
+
+      // ======================
+      // 8️⃣ Tìm kiếm toàn bộ
+      // ======================
+      document.getElementById('globalSearch').addEventListener('input', (e) => {
+        gridApi.setGridOption('quickFilterText', e.target.value)
+      })
+
+      // ======================
+      // 9️⃣ Export CSV
+      // ======================
+      document.getElementById('exportExcel').addEventListener('click', () => {
+        gridApi.exportDataAsCsv({
+          fileName: 'tree_data.csv'
+        })
+      })
+
+      // ======================
+      // 🔟 Copy dòng chọn
+      // ======================
+      document.getElementById('copyRow').addEventListener('click', () => {
+        const selected = gridApi.getSelectedRows()
+        if (!selected.length) {
+          alert('⚠️ Chưa chọn dòng nào để copy!')
+          return
+        }
+
+        const text = selected
+          .map(
+            (r) =>
+              `${r.name || ''}\t${r.col1 || ''}\t${r.col2 || ''}\t${
+                r.col3 || ''
+              }`
+          )
+          .join('\n')
+
+        navigator.clipboard.writeText(text).then(() => {
+          alert('✅ Đã copy ' + selected.length + ' dòng vào clipboard!')
+        })
+      })
+    </script>
+  </body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tabulator Tree Table - Advanced Example</title>
+    <link
+      href="https://unpkg.com/tabulator-tables@6.2.0/dist/css/tabulator.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/tabulator-tables@6.2.0/dist/js/tabulator.min.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #toolbar {
+        margin-bottom: 10px;
+      }
+      #search {
+        padding: 5px;
+        width: 240px;
+      }
+      button {
+        padding: 6px 12px;
+        margin-left: 6px;
+      }
+      .tabulator-header-filter input {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 12px;
+        padding: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🏢 Danh sách tổ chức - Tree Table (Tabulator)</h2>
+    <div id="toolbar">
+      <input id="search" placeholder="🔍 Tìm kiếm toàn bộ..." />
+      <button id="download-xlsx">📥 Xuất Excel</button>
+    </div>
+    <div id="example-table"></div>
+
+    <script>
+      // =========================
+      // HÀM SINH DỮ LIỆU MẪU NHIỀU CẤP
+      // =========================
+      function genData(totalRows = 1000) {
+        const baseCompanies = ['FPT', 'Viettel', 'VNPT', 'CMC', 'MobiFone']
+        const countries = ['Vietnam', 'Japan', 'Korea', 'USA']
+        const data = []
+        let id = 1
+
+        // Mỗi company có nhiều Subsidiary, mỗi Subsidiary có nhiều Team
+        baseCompanies.forEach((companyName) => {
+          const company = {
+            id: id++,
+            name: companyName,
+            type: 'Company',
+            country: 'Vietnam',
+            employees: rand(5000, 20000),
+            revenue: rand(800, 2500),
+            year: rand(1980, 2010),
+            _children: []
+          }
+
+          const numSubs = rand(2, 5)
+          for (let i = 0; i < numSubs; i++) {
+            const subName = `${companyName}-Sub${i + 1}`
+            const sub = {
+              id: id++,
+              name: subName,
+              type: 'Subsidiary',
+              country: pick(countries),
+              employees: rand(500, 5000),
+              revenue: rand(100, 800),
+              year: rand(1990, 2015),
+              _children: []
+            }
+
+            const numTeams = rand(2, 5)
+            for (let j = 0; j < numTeams; j++) {
+              sub._children.push({
+                id: id++,
+                name: `${subName}-Team${j + 1}`,
+                type: 'Team',
+                country: sub.country,
+                employees: rand(50, 500),
+                revenue: rand(10, 200),
+                year: rand(2000, 2024)
+              })
+            }
+
+            company._children.push(sub)
+          }
+
+          data.push(company)
+        })
+
+        // Cắt bớt nếu tổng số dòng vượt quá giới hạn
+        const flatCount = countNodes(data)
+        if (flatCount > totalRows) {
+          return trimTree(data, totalRows)
+        }
+
+        return data
+      }
+
+      // =========================
+      // HÀM TIỆN ÍCH PHỤ TRỢ
+      // =========================
+      function rand(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min
+      }
+
+      function pick(arr) {
+        return arr[Math.floor(Math.random() * arr.length)]
+      }
+
+      function countNodes(nodes) {
+        let count = 0
+        nodes.forEach((n) => {
+          count++
+          if (n._children) count += countNodes(n._children)
+        })
+        return count
+      }
+
+      function trimTree(nodes, limit, acc = []) {
+        for (const node of nodes) {
+          if (acc.length >= limit) break
+          const copy = { ...node }
+          if (copy._children) {
+            copy._children = trimTree(copy._children, limit, acc)
+          }
+          acc.push(copy)
+        }
+        return acc
+      }
+
+      const tableData = genData(5000)
+      console.log(tableData.length)
+
+      // =========================
+      // CẤU HÌNH BẢNG TABULATOR
+      // =========================
+      const table = new Tabulator('#example-table', {
+        data: tableData,
+        layout: 'fitColumns',
+        dataTree: true,
+        dataTreeStartExpanded: true,
+        clipboard: true, // Cho phép copy
+        height: '600px',
+        placeholder: 'Không có dữ liệu',
+        pagination: 'local',
+        paginationSize: 5000,
+        paginationSizeSelector: [100, 1000, 5000, 10000], // cho phép chọn số dòng
+        selectable: true, // ✅ Cho phép chọn nhiều dòng
+        clipboard: true, // ✅ Cho phép copy (Ctrl + C)
+        clipboardCopyStyled: false, // ✅ Copy chỉ giá trị, không style
+        clipboardPasteAction: 'none', // ✅ Không cho paste đè dữ liệu
+        columns: [
+          { title: 'STT', formatter: 'rownum', width: 70, hozAlign: 'center' },
+          { title: 'Tên', field: 'name', width: 220, headerFilter: 'input' },
+          { title: 'Loại', field: 'type', width: 140, headerFilter: 'input' },
+          {
+            title: 'Quốc gia',
+            field: 'country',
+            width: 120,
+            headerFilter: 'input'
+          },
+          {
+            title: 'Nhân viên',
+            field: 'employees',
+            hozAlign: 'right',
+            width: 110,
+            headerFilter: 'input'
+          },
+          {
+            title: 'Doanh thu (triệu $)',
+            field: 'revenue',
+            hozAlign: 'right',
+            width: 130,
+            headerFilter: 'input'
+          },
+          {
+            title: 'Năm thành lập',
+            field: 'year',
+            hozAlign: 'center',
+            width: 110,
+            headerFilter: 'input'
+          }
+        ]
+      })
+
+      // =========================
+      // TÌM KIẾM TOÀN CỤC
+      // =========================
+      document.getElementById('search').addEventListener('keyup', function () {
+        const val = this.value.toLowerCase()
+        table.setFilter([
+          [
+            { field: 'name', type: 'like', value: val },
+            { field: 'type', type: 'like', value: val },
+            { field: 'country', type: 'like', value: val }
+          ]
+        ])
+      })
+
+      // =========================
+      // EXPORT EXCEL
+      // =========================
+      document
+        .getElementById('download-xlsx')
+        .addEventListener('click', function () {
+          table.download('xlsx', 'tree-table.xlsx', { sheetName: 'Danh sách' })
+        })
+    </script>
+  </body>
+</html>
