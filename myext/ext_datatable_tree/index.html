@@ -1,168 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <title>Tableau Extension</title>
+    <title>AG Grid TreeView - Community Edition</title>
+
+    <!-- AG Grid Community -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
     <script src="../../lib/tableau.extensions.1.latest.js"></script>
     <script src="script.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-quartz.css"
+    />
+
     <style>
-      html,
       body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
+        margin: 20px;
+        font-family: sans-serif;
       }
-
-      .table-container {
-        height: 100vh; /* hoặc chiều cao cụ thể nếu muốn */
-        overflow: auto;
-        position: relative;
-      }
-      /* Thẻ table phải có border collapse */
-      table {
-        border-collapse: collapse;
+      #gridContainer {
+        height: 600px;
         width: 100%;
-        font-family: Arial, sans-serif;
       }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
+      .toolbar {
+        margin-bottom: 10px;
       }
-      th {
-        background-color: #f2f2f2;
+      input,
+      button {
+        padding: 6px 10px;
+        margin-right: 10px;
+      }
+      .tree-indent {
+        display: inline-block;
+        width: 18px;
+      }
+      .toggle-btn {
+        cursor: pointer;
         font-weight: bold;
-        text-align: center;
-        vertical-align: middle;
-      }
-      tr:nth-child(even) {
-        background-color: #f9f9f9;
-      }
-      .expander {
-        width: 24px;
-        height: 24px;
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 16px;
-        margin-right: 5px;
-      }
-      .expander:hover {
-        background-color: #e0e0e0;
-        border-radius: 4px;
-      }
-      input#search {
-        width: 100%;
-        margin-bottom: 1px;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      .filter-btn {
-        padding: 5px 10px;
-        background-color: #4caf50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .filter-btn:hover {
-        background-color: #45a049;
+        color: #0078d7;
       }
 
-      /* Sticky header */
-      #dataTable thead tr:nth-child(1) th {
-        position: sticky;
-        top: 35px; /* chiều cao của input search */
-        background-color: #f2f2f2;
-        z-index: 2;
+      /* css cho dòn tổng */
+      .ag-row-pinned {
+        font-weight: bold !important;
+        background-color: #f0f0f0 !important;
       }
 
-      /* Sticky filter row */
-      #dataTable thead tr:nth-child(2) th {
-        position: sticky;
-        top: 68px; /* chiều cao input + header */
-        background-color: #f2f2f2;
-        z-index: 1;
+      /* css xem kẽ dòng */
+      .ag-row:nth-child(even) {
+        background-color: #f9f9f9; /* màu cho dòng chẵn */
       }
 
-      #dataTable td:first-child,
-      #dataTable th:first-child {
-        width: 300px; /* hoặc auto + min-width */
-        min-width: 200px;
-        max-width: 400px;
-        white-space: nowrap; /* không xuống dòng */
+      .ag-row:nth-child(odd) {
+        background-color: #ffffff; /* màu cho dòng lẻ */
       }
 
-      tr.selected {
-        background-color: #cce5ff; /* xanh nhạt */
-      }
-
-      #tool-box {
-        display: flex;
-        align-items: center; /* canh giữa theo chiều dọc */
-        gap: 10px; /* khoảng cách giữa input và button */
-        /* padding: 5px; */
-        background: white;
-        position: sticky;
-        top: 0;
-        z-index: 5;
-        border-bottom: 1px solid #ccc;
-      }
-
-      #tool-box input#search {
-        flex: 1; /* để input chiếm hết chiều rộng còn lại */
-      }
-
-      #tool-box button {
-        padding: 8px 12px;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-
-      #tool-box button:hover {
-        background-color: #0056b3;
-      }
-
-      /* căn phải cho số */
-      td.number-cell {
-        text-align: right;
-        white-space: normal; /* cho phép xuống dòng */
-        word-wrap: break-word;
-      }
-
-      th,
-      td {
-        min-width: 30px;
-        max-width: 300px;
-        white-space: normal;
-        word-wrap: break-word;
+      /* them cái này để bôi đen được dòng*/
+      .ag-cell {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
       }
     </style>
   </head>
   <body>
-    <div class="table-container">
-      <div id="tool-box">
-        <button onclick="expandAll()">Expand All</button>
-        <button onclick="collapseAll()">Collapse All</button>
-        <input
-          type="text"
-          id="search"
-          placeholder="Search across table..."
-          onkeyup="globalSearch()"
-        />
-        <button>Export Excel</button>
-      </div>
-
-      <table id="dataTable">
-        <thead id="thead"></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <div class="toolbar">
+      🔍
+      <input type="text" id="globalSearch" placeholder="Tìm kiếm toàn bộ..." />
+      <button id="exportExcel">📤 Export CSV</button>
+      <button id="copyCellBtn">📋 Copy ô được chọn</button>
+      <button id="copyRow">📋 Copy dòng được chọn</button>
     </div>
+
+    <div id="gridContainer" class="ag-theme-quartz"></div>
   </body>
 </html>

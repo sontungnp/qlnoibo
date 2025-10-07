@@ -1,552 +1,442 @@
 'use strict'
 
-let selectedRows = new Set() // lưu index của các dòng được chọn
-let lastClickedIndex = null
-let root = null
-
-// click chọn dòng
-function attachRowClick(tr) {
-  tr.addEventListener('click', (event) => {
-    let allRows = Array.from(tr.parentNode.querySelectorAll('tr'))
-    let rowIndex = allRows.indexOf(tr) // xác định index thực tế trong tbody
-
-    if (event.shiftKey && lastClickedIndex !== null) {
-      let start = Math.min(lastClickedIndex, rowIndex)
-      let end = Math.max(lastClickedIndex, rowIndex)
-      allRows.forEach((r, i) => {
-        if (i >= start && i <= end) {
-          r.classList.add('selected')
-          selectedRows.add(i)
-        }
-      })
-    } else if (event.ctrlKey || event.metaKey) {
-      if (tr.classList.contains('selected')) {
-        tr.classList.remove('selected')
-        selectedRows.delete(rowIndex)
-      } else {
-        tr.classList.add('selected')
-        selectedRows.add(rowIndex)
-      }
-      lastClickedIndex = rowIndex
-    } else {
-      // clear tất cả
-      allRows.forEach((r, i) => r.classList.remove('selected'))
-      selectedRows.clear()
-
-      // chọn mới
-      tr.classList.add('selected')
-      selectedRows.add(rowIndex)
-      lastClickedIndex = rowIndex
-    }
-  })
-}
+let selectedCellValue = null
 
 // Hàm chuẩn hóa chỉ để đồng bộ Unicode, không bỏ dấu
 function normalizeUnicode(str) {
-  return str
-    ? str
-        .normalize('NFC') // chuẩn hóa Unicode về NFC
-        .toLowerCase() // chuyển về thường để bỏ phân biệt hoa/thường
-        .trim() // bỏ khoảng trắng thừa
-    : ''
+  return str ? str.normalize('NFC').toLowerCase().trim() : ''
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  tableau.extensions.initializeAsync().then(() => {
-    console.log('x1')
-
-    const dashboard = tableau.extensions.dashboardContent.dashboard
-    const worksheet = dashboard.worksheets[0] // Assumes the first worksheet; adjust if needed
-    console.log('worksheet', worksheet)
-    worksheet.getSummaryDataAsync({ maxRows: 0 }).then((dataTable) => {
-      console.log('dataTable', dataTable)
-      processAndDisplayData(dataTable, worksheet)
-    })
-  })
-})
-
-function processAndDisplayData(dataTable, worksheet) {
-  let columns = dataTable.columns
-  let data = dataTable.data
-
-  console.log('data', data)
-
-  // Step 2: Filter out columns starting with 'hidden'
-  const hiddenPrefix = 'hidden'.toLowerCase()
-  let keepIndices = columns
-    .map((col, i) =>
-      col.fieldName.toLowerCase().startsWith(hiddenPrefix) ? -1 : i
-    )
-    .filter((i) => i >= 0)
-  let filteredColumns = keepIndices.map((i) => columns[i])
-  let filteredData = data.map((row) => keepIndices.map((i) => row[i]))
-
-  // Step 3: Pivot data if it has 'Measure Names' and 'Measure Values'
-  let pivotedColumns = filteredColumns
-  let pivotedData = filteredData
-  let measureNameIdx = filteredColumns.findIndex(
-    (col) => col.fieldName === 'Measure Names'
-  )
-  let measureValueIdx = filteredColumns.findIndex(
-    (col) => col.fieldName === 'Measure Values'
-  )
-  if (measureNameIdx !== -1 && measureValueIdx !== -1) {
-    let dimIndices = filteredColumns
-      .map((_, i) => i)
-      .filter((i) => i !== measureNameIdx && i !== measureValueIdx)
-    let measures = [
-      ...new Set(
-        filteredData.map(
-          (row) =>
-            row[measureNameIdx].formattedValue || row[measureNameIdx].value
-        )
-      )
-    ]
-    pivotedColumns = dimIndices
-      .map((i) => filteredColumns[i])
-      .concat(measures.map((m) => ({ fieldName: m, dataType: 'number' })))
-    let groupMap = new Map()
-    for (let row of filteredData) {
-      let key = dimIndices.map((i) => row[i].value ?? 'null').join('||')
-      if (!groupMap.has(key)) {
-        groupMap.set(key, { dims: dimIndices.map((i) => row[i]), values: {} })
-      }
-      let m = row[measureNameIdx].formattedValue || row[measureNameIdx].value
-      let v = row[measureValueIdx].value
-      let fv = row[measureValueIdx].formattedValue
-      groupMap.get(key).values[m] = { value: v, formattedValue: fv }
+// Pivot Measure Names/Values
+function pivotMeasureValues(
+  table,
+  excludeIndexes = [],
+  fieldFormat = 'snake_case'
+) {
+  // 🔹 Hàm chuyển format cho key field
+  const formatField = (str) => {
+    switch (fieldFormat) {
+      case 'camelCase':
+        return str
+          .replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, (match, index) =>
+            index === 0 ? match.toLowerCase() : match.toUpperCase()
+          )
+          .replace(/\s+/g, '')
+      case 'snake_case':
+        return str.replace(/\s+/g, '_')
+      default:
+        return str // Giữ nguyên
     }
-    pivotedData = Array.from(groupMap.values()).map((g) =>
-      g.dims.concat(
-        measures.map((m) => g.values[m] || { value: null, formattedValue: '' })
-      )
-    )
   }
 
-  // Step 4: Convert flat data to tree using all tree_l* columns dynamically
-  let treeColumns = pivotedColumns
-    .map((col, idx) => {
-      const match = col.fieldName.match(/^tree_l(\d+)$/)
-      return match ? { col, idx, level: parseInt(match[1]) } : null
-    })
-    .filter((c) => c !== null)
-    .sort((a, b) => a.level - b.level)
-
-  if (treeColumns.length === 0) {
-    console.error(
-      'No tree columns found; fallback to flat display not implemented.'
+  const cols = table.columns.map((c) => c.fieldName)
+  const rows = table.data.map((r) =>
+    r.map((c) =>
+      c.formattedValue === null || c.formattedValue === undefined
+        ? ''
+        : c.formattedValue
     )
-    return
-  }
-
-  let treeIndices = treeColumns.map((c) => c.idx)
-  let valueIndices = pivotedColumns
-    .map((_, i) => (treeIndices.includes(i) ? -1 : i))
-    .filter((i) => i >= 0)
-
-  // Xác định các cột measure và dimension
-  let measureIndices = valueIndices.filter((i) =>
-    ['number', 'float', 'integer'].includes(pivotedColumns[i].dataType)
-  )
-  let dimIndices = valueIndices.filter(
-    (i) => !['number', 'float', 'integer'].includes(pivotedColumns[i].dataType)
   )
 
-  let tableColumns = [
-    { fieldName: 'Hierarchy' },
-    ...valueIndices.map((i) => pivotedColumns[i])
+  // 🔹 Loại bỏ cột không cần
+  const filteredCols = cols.filter((_, i) => !excludeIndexes.includes(i))
+  const filteredRows = rows.map((r) =>
+    r.filter((_, i) => !excludeIndexes.includes(i))
+  )
+
+  // 🔹 Xác định vị trí Measure Names / Values
+  const measureNameIdx = filteredCols.findIndex((c) =>
+    c.toLowerCase().includes('measure names')
+  )
+  const measureValueIdx = filteredCols.findIndex((c) =>
+    c.toLowerCase().includes('measure values')
+  )
+
+  const dimensionIdxs = filteredCols
+    .map((c, i) => i)
+    .filter((i) => i !== measureNameIdx && i !== measureValueIdx)
+
+  const pivotMap = new Map()
+  const measureSet = new Set()
+
+  filteredRows.forEach((r) => {
+    const dimKey = dimensionIdxs.map((i) => r[i]).join('||')
+    const mName = r[measureNameIdx]
+    const mValue = r[measureValueIdx]
+
+    measureSet.add(mName)
+
+    if (!pivotMap.has(dimKey)) {
+      pivotMap.set(dimKey, {
+        dims: dimensionIdxs.map((i) => r[i]),
+        measures: {}
+      })
+    }
+    pivotMap.get(dimKey).measures[mName] = mValue
+  })
+
+  const measureNames = Array.from(measureSet)
+  const headers = [
+    ...dimensionIdxs.map((i) => filteredCols[i]),
+    ...measureNames
+  ]
+  const isMeasure = [
+    ...dimensionIdxs.map(() => false),
+    ...measureNames.map(() => true)
   ]
 
-  console.log('tableColumns', tableColumns)
+  // ⚡ Sinh dữ liệu dạng object (key = field format)
+  const data = Array.from(pivotMap.values()).map((entry) => {
+    const row = {}
+    headers.forEach((h, idx) => {
+      // Bỏ phần (width) nếu có
+      const cleanHeader = h.replace(/\(\s*\d+\s*\)\s*$/, '').trim()
+      const key = formatField(cleanHeader)
 
-  // Build tree structure
-  root = {
-    name: 'Root',
-    children: [],
-    level: 0,
-    isExpanded: true,
-    data: null
-  }
-  let idCounter = 0
-  for (let row of pivotedData) {
-    let levels = treeIndices.map(
-      (idx) => row[idx].formattedValue || row[idx].value
-    )
-    let current = root
-    for (let lev = 0; lev < levels.length; lev++) {
-      let name = levels[lev]
-      if (name == null || name === '') break
-      let child = current.children.find((c) => c.name === name)
-      if (!child) {
-        child = {
-          name,
-          children: [],
-          level: (current.level || 0) + 1, // ✅ luôn dựa vào cha
-          isExpanded: false,
-          data: null,
-          id: idCounter++
-        }
-        current.children.push(child)
+      if (idx < dimensionIdxs.length) {
+        row[key] = entry.dims[idx]
+      } else {
+        const mName = measureNames[idx - dimensionIdxs.length]
+        const rawValue = entry.measures[mName] || ''
+        const numValue = parseFloat(rawValue.toString().replace(/,/g, ''))
+        row[key] = !isNaN(numValue) ? numValue : rawValue
       }
-      current = child
-    }
-    current.data = valueIndices.map((i) => row[i])
-  }
-
-  // Compute aggregates for parent nodes (sum assuming numeric values)
-  function computeAggregates(node) {
-    if (node.children.length === 0) return
-    node.children.forEach(computeAggregates)
-
-    // Khởi tạo node.data với giá trị mặc định
-    node.data = new Array(valueIndices.length).fill(0).map((_, idx) => {
-      // Nếu là cột dimension, để trống
-      if (dimIndices.includes(valueIndices[idx])) {
-        return { value: null, formattedValue: '' }
-      }
-      // Nếu là cột measure, khởi tạo giá trị số 0
-      return { value: 0, formattedValue: '0' }
     })
-
-    // Tính tổng chỉ cho các cột measure
-    for (let child of node.children) {
-      child.data.forEach((cd, j) => {
-        // Chỉ tính tổng nếu cột thuộc measureIndices
-        if (measureIndices.includes(valueIndices[j])) {
-          let v = parseFloat(cd.value) || 0
-          node.data[j].value += v
-          node.data[j].formattedValue = node.data[j].value.toString()
-        }
-      })
-    }
-  }
-  computeAggregates(root)
-
-  // Step 5: Display in table with header, filter buttons, and tree data
-  const thead = document.getElementById('thead')
-  let headerTr = document.createElement('tr')
-  tableColumns.forEach((col) => {
-    let th = document.createElement('th')
-    th.textContent = col.fieldName
-    headerTr.appendChild(th)
+    return row
   })
-  thead.appendChild(headerTr)
 
-  // Second row: buttons "filter"
-  let filterTr = document.createElement('tr')
-  tableColumns.forEach((col, i) => {
-    let td = document.createElement('th')
-    let btn = document.createElement('button')
-    btn.textContent = 'Filter'
-    btn.classList.add('filter-btn')
-    if (i > 0) {
-      // Skip hierarchy column
-      btn.onclick = () => worksheet.clearFilterAsync(col.fieldName)
-    } else {
-      btn.disabled = true
-    }
-    td.appendChild(btn)
-    filterTr.appendChild(td)
-  })
-  thead.appendChild(filterTr)
+  // ⚡ columnDefs khớp field format, có xử lý width và numericColumn
+  let demTree = 0
+  const tmpColumnDefs = headers.map((h, idx) => {
+    const widthMatch = h.match(/\((\d+)\)/)
+    const width = widthMatch ? parseInt(widthMatch[1], 10) : 150 // mặc định 150
+    const cleanHeader = h.replace(/\(\s*\d+\s*\)\s*$/, '').trim()
+    const fieldName = formatField(cleanHeader)
+    console.log('demTree', demTree)
 
-  const tbody = document.getElementById('tbody')
+    if (fieldName.startsWith('tree_lv')) {
+      if (demTree === 0) {
+        demTree = demTree + 1
+        return {
+          headerName: 'Cấu trúc cây',
+          field: 'name',
+          flex: 2,
+          cellRenderer: (params) => {
+            const node = params.data
+            if (!node) return ''
 
-  // Render tree nodes with dynamic indentation
-  function renderNode(node, parent = null) {
-    let tr = document.createElement('tr')
-    node.row = tr
-    let tdName = document.createElement('td')
-    tdName.style.paddingLeft = `${node.level * 20}px`
-    let expander
-    if (node.children.length > 0) {
-      expander = document.createElement('button')
-      expander.classList.add('expander')
-      expander.textContent = node.isExpanded ? '−' : '+'
-      expander.title = node.isExpanded ? 'Collapse' : 'Expand'
-      expander.onclick = () => toggleExpand(node, expander)
-    } else {
-      // để giữ chỗ indent, thêm span rỗng nhưng có cùng chiều rộng với expander
-      expander = document.createElement('span')
-      expander.style.display = 'inline-block'
-      expander.style.width = '24px' // bằng với button.expander
-    }
-    tdName.appendChild(expander)
-    tdName.appendChild(document.createTextNode(node.name))
-    tr.appendChild(tdName)
-    if (node.data) {
-      node.data.forEach((d, j) => {
-        let td = document.createElement('td')
-
-        // Nếu cột là measure thì format số & căn phải
-        if (measureIndices.includes(valueIndices[j])) {
-          let val = parseFloat(d.value)
-          if (!isNaN(val)) {
-            td.textContent = val.toLocaleString('en-US') // format số
-          } else {
-            td.textContent = d.formattedValue || d.value || ''
+            const indent = '<span class="tree-indent"></span>'.repeat(
+              node.level - 1
+            )
+            if (node.leaf) {
+              return indent + '📄 ' + (node.name || '')
+            } else {
+              const symbol = node.expanded ? '➖' : '➕'
+              return (
+                indent +
+                `<span class="toggle-btn" data-id="${node.id}">${symbol}</span> 📁 ` +
+                node.name
+              )
+            }
           }
-          td.classList.add('number-cell') // thêm class căn phải
-        } else {
-          td.textContent = d.formattedValue || d.value || ''
         }
-
-        tr.appendChild(td)
-      })
-    } else {
-      for (let i = 0; i < valueIndices.length; i++) {
-        tr.appendChild(document.createElement('td'))
       }
-    }
-    tbody.appendChild(tr)
-
-    attachRowClick(tr, tbody.rows.length - 1)
-
-    if (parent && !parent.isExpanded) {
-      tr.style.display = 'none'
-    }
-    node.children.forEach((child) => renderNode(child, node))
-  }
-  root.children.forEach((child) => renderNode(child, root))
-
-  adjustColumnWidthsBasedOnData()
-
-  // Sau khi render xong, tính toán và cập nhật sticky positions
-  // updateStickyPositions()
-
-  // Step 6: Global search
-  window.globalSearch = function () {
-    let searchText = normalizeUnicode(
-      document.getElementById('search').value.toLowerCase()
-    )
-    updateFilter(root, searchText)
-    // Update visibility after filter
-    if (searchText === '') {
-      root.isExpanded = true
-      showDescendants(root)
-    }
-  }
-
-  function updateFilter(node, searchText) {
-    let matches = false
-    node.children.forEach((child) => {
-      if (updateFilter(child, searchText)) matches = true
-    })
-    let selfMatch = node.name.toLowerCase().includes(searchText)
-    if (node.data) {
-      selfMatch =
-        selfMatch ||
-        node.data.some(
-          (d) =>
-            (d.value?.toString().toLowerCase() || '').includes(searchText) ||
-            (d.formattedValue?.toLowerCase() || '').includes(searchText)
-        )
-    }
-    if (selfMatch) matches = true
-    if (matches || searchText === '') {
-      node.row.style.display = 'table-row'
-      if (matches && searchText !== '') node.isExpanded = true
     } else {
-      node.row.style.display = 'none'
+      const colDef = {
+        field: fieldName,
+        headerName: cleanHeader,
+        wrapText: true,
+        autoHeight: true,
+        width: width,
+        minWidth: 30,
+        maxWidth: 500,
+        cellStyle: (params) => {
+          // Căn phải cho số, căn trái cho text
+          return isMeasure[idx]
+            ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+            : { textAlign: 'left' }
+        }
+      }
+
+      if (isMeasure[idx]) {
+        colDef.type = 'numericColumn'
+        colDef.valueFormatter = (params) => {
+          const v = params.value
+          if (v == null || v === '') return ''
+          const num = Number(v)
+          if (isNaN(num)) return v
+          // 🔹 Format với phân tách hàng nghìn, tối đa 2 chữ số thập phân
+          return num.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+        }
+      }
+
+      return colDef
     }
-    return matches
-  }
-}
+  })
 
-// === adjust column widths using ALL nodes (including collapsed) - Approach 1 ===
-function adjustColumnWidthsBasedOnData() {
-  const table = document.getElementById('dataTable')
-  const headerRow = table.querySelector('thead tr:first-child')
-  if (!headerRow) return
-  const cols = headerRow.cells.length
-
-  // collect unique texts per column to avoid duplicate measurements (Set)
-  const textsByCol = Array.from({ length: cols }, () => new Set())
-
-  // add header text
-  Array.from(headerRow.cells).forEach((th, i) =>
-    textsByCol[i].add((th.innerText || '').trim())
+  const columnDefs = tmpColumnDefs.filter(
+    (item) => item !== null && item !== undefined
   )
 
-  // add filter row text (nếu có)
-  const filterRow = table.querySelector('thead tr:nth-child(2)')
-  if (filterRow) {
-    Array.from(filterRow.cells).forEach((th, i) =>
-      textsByCol[i].add((th.innerText || '').trim())
+  return { headers, data, isMeasure, columnDefs }
+}
+
+let gridApi = null
+
+// Load lại dữ liệu và render
+function loadAndRender(worksheet) {
+  worksheet.getSummaryDataAsync({ maxRows: 0 }).then((sumData) => {
+    let idCounter = 0
+
+    // ======================
+    // 1️⃣ Dữ liệu gốc
+    // ======================
+
+    // console.log('sumData', sumData)
+
+    // Xác định cột cần loại bỏ
+    const excludeCols = sumData.columns
+      .map((col, idx) => ({ name: col.fieldName, idx }))
+      .filter(
+        (c) =>
+          c.name.toLowerCase().startsWith('hiden') || c.name.startsWith('AGG')
+      )
+      .map((c) => c.idx)
+
+    const { headers, data, isMeasure, columnDefs } = pivotMeasureValues(
+      sumData,
+      excludeCols
     )
-  }
 
-  // traverse tree data model (root) to collect every node's displayed values
-  function traverse(node) {
-    // column 0: hierarchy name
-    textsByCol[0].add(node.name || '')
+    console.log('headers', headers)
+    console.log('columnDefs', columnDefs)
+    console.log('data', data)
 
-    // other columns: node.data is array of { value, formattedValue } or empty
-    if (node.data) {
-      node.data.forEach((d, j) => {
-        const colIdx = j + 1 // because col 0 is Hierarchy
-        textsByCol[colIdx].add(String(d.formattedValue ?? d.value ?? ''))
-      })
-    } else {
-      // if node has no data, still ensure entry (empty string)
-      for (let k = 1; k < cols; k++) textsByCol[k].add('')
-    }
+    console.log('isMeasure', isMeasure)
 
-    node.children.forEach(traverse)
-  }
-  root.children.forEach(traverse)
+    // ======================
+    // 4️⃣ Tree data + Flatten ban đầu
+    // ======================
+    const nestedData = buildTree(data)
+    let flatData = flattenTree(nestedData)
 
-  // compute max depth (for indent width)
-  function getMaxLevel(node) {
-    let max = node.level || 0
-    for (const c of node.children) {
-      max = Math.max(max, getMaxLevel(c))
-    }
-    return max
-  }
-  const maxLevel = getMaxLevel(root)
+    console.log('data', data)
+    console.log('nestedData', nestedData)
+    console.log('flatData', flatData)
 
-  // measure unique texts using a hidden span (faster than many elements)
-  const tmp = document.createElement('span')
-  tmp.style.visibility = 'hidden'
-  tmp.style.position = 'absolute'
-  tmp.style.whiteSpace = 'nowrap'
-  tmp.style.font = window.getComputedStyle(table).font // try to match font
-  document.body.appendChild(tmp)
+    // ======================
+    // 6️⃣ Cấu hình AG Grid
+    // ======================
+    const gridOptions = {
+      columnDefs,
+      rowData: flatData,
+      defaultColDef: {
+        filter: true,
+        sortable: true,
+        resizable: true
+      },
+      rowSelection: {
+        mode: 'multiRow',
+        checkboxes: true
+      },
+      suppressRowClickSelection: false,
 
-  const colWidths = new Array(cols).fill(30) // start with min 30
-
-  const MAX_MEASURE_TEXTS = 1000 // safety cap per column (tùy chỉnh nếu cần)
-  for (let i = 0; i < cols; i++) {
-    let count = 0
-    for (const txt of textsByCol[i]) {
-      tmp.innerText = txt || ''
-      let w = tmp.offsetWidth + 20 // add padding buffer
-      if (w > colWidths[i]) colWidths[i] = w
-      count++
-      if (count >= MAX_MEASURE_TEXTS) break
-    }
-    // for hierarchy column, add indent + expander width
-    if (i === 0) {
-      colWidths[i] += maxLevel * 20 + 24
-    }
-    if (colWidths[i] > 300) colWidths[i] = 300
-    if (colWidths[i] < 30) colWidths[i] = 30
-  }
-
-  document.body.removeChild(tmp)
-
-  // apply widths to all header and body cells
-  for (let i = 0; i < cols; i++) {
-    const nodes = table.querySelectorAll(
-      `tr td:nth-child(${i + 1}), tr th:nth-child(${i + 1})`
-    )
-    nodes.forEach((cell) => {
-      cell.style.width = colWidths[i] + 'px'
-      // allow wrap
-      cell.style.whiteSpace = 'normal'
-    })
-  }
-}
-
-function toggleExpand(node, expander) {
-  node.isExpanded = !node.isExpanded
-  expander.textContent = node.isExpanded ? '−' : '+'
-  expander.title = node.isExpanded ? 'Collapse' : 'Expand'
-  if (node.isExpanded) {
-    node.children.forEach((child) => {
-      child.row.style.display = 'table-row'
-      if (child.isExpanded) showDescendants(child)
-    })
-  } else {
-    hideDescendants(node)
-  }
-}
-
-// Mở rộng tất cả các node
-function expandAll(node = root) {
-  if (!node) return
-  node.isExpanded = true
-  if (node.row) {
-    const expander = node.row.querySelector('.expander')
-    if (expander) {
-      expander.textContent = '−'
-      expander.title = 'Collapse'
-    }
-    node.row.style.display = 'table-row' // Hiển thị cả node lá
-  }
-  node.children.forEach(expandAll)
-}
-
-// Thu gọn tất cả các node
-function collapseAll() {
-  root.children.forEach((child) => {
-    if (child.row) {
-      child.isExpanded = false
-      const expander = child.row.querySelector('.expander')
-      if (expander) {
-        expander.textContent = '+'
-        expander.title = 'Expand'
+      // sự kiện click vào 1 cell
+      onCellClicked: (params) => {
+        const el = params.event.target
+        if (el.classList.contains('toggle-btn')) {
+          toggleNode(el.dataset.id)
+        } else {
+          selectedCellValue = params.value
+          console.log('Selected cell value:', selectedCellValue)
+          // Bỏ chọn tất cả dòng khác
+          gridApi.deselectAll()
+          // Chọn dòng hiện tại
+          params.node.setSelected(true)
+        }
       }
-      child.row.style.display = 'table-row' // Giữ node cấp cao nhất hiển thị
-      hideDescendants(child) // Ẩn tất cả node con
     }
+
+    const eGridDiv = document.getElementById('gridContainer')
+    // const gridApi = agGrid.createGrid(eGridDiv, gridOptions)
+    if (!gridApi) {
+      // ❗ Chỉ tạo grid 1 lần
+      gridApi = agGrid.createGrid(eGridDiv, gridOptions)
+    } else {
+      // ✅ Cập nhật lại dữ liệu
+      gridApi.setGridOption('rowData', data)
+      gridApi.setGridOption('columnDefs', columnDefs)
+      updateFooterTotals()
+    }
+
+    // ======================
+    // 2️⃣ Hàm tạo dữ liệu tree
+    // ======================
+    function buildTree(data) {
+      let idCounter = 0
+      const rootMap = {}
+
+      for (const row of data) {
+        // Lấy tất cả các cấp tree_lv1...tree_lvN
+        const treeLevels = Object.keys(row)
+          .filter((k) => k.startsWith('tree_lv'))
+          .sort((a, b) => {
+            const na = parseInt(a.replace('tree_lv', ''))
+            const nb = parseInt(b.replace('tree_lv', ''))
+            return na - nb
+          })
+
+        let currentLevel = rootMap
+        let parent = null
+
+        // Duyệt từng cấp
+        treeLevels.forEach((key, i) => {
+          const value = row[key]
+          if (!currentLevel[value]) {
+            currentLevel[value] = {
+              id: ++idCounter,
+              name: value,
+              level: i + 1,
+              expanded: false,
+              leaf: false,
+              children: {}
+            }
+          }
+          parent = currentLevel[value]
+          currentLevel = parent.children
+        })
+
+        // Cấp cuối cùng -> thêm dòng dữ liệu leaf
+        parent.children[`leaf_${++idCounter}`] = {
+          id: idCounter,
+          name: null,
+          level: treeLevels.length + 1,
+          leaf: true,
+          col1: row.col1,
+          col2: row.col2,
+          col3: row.col3
+        }
+      }
+
+      return Object.values(rootMap).map((n) => normalizeTree(n))
+    }
+
+    function normalizeTree(node) {
+      if (node.children && !Array.isArray(node.children)) {
+        node.children = Object.values(node.children).map((n) =>
+          normalizeTree(n)
+        )
+      }
+      return node
+    }
+
+    // ======================
+    // 3️⃣ Flatten tree (để hiển thị)
+    // ======================
+    function flattenTree(nodes) {
+      let result = []
+      for (const n of nodes) {
+        result.push(n)
+        if (n.expanded && n.children) {
+          result = result.concat(flattenTree(n.children))
+        }
+      }
+      return result
+    }
+
+    // ======================
+    // 7️⃣ Toggle expand/collapse
+    // ======================
+    function toggleNode(nodeId) {
+      function recursiveToggle(nodes) {
+        for (const n of nodes) {
+          if (n.id == nodeId) {
+            n.expanded = !n.expanded
+            break
+          }
+          if (n.children) recursiveToggle(n.children)
+        }
+      }
+      recursiveToggle(nestedData)
+      flatData = flattenTree(nestedData)
+      gridApi.setGridOption('rowData', flatData)
+    }
+
+    // ======================
+    // 8️⃣ Tìm kiếm toàn bộ
+    // ======================
+    document.getElementById('globalSearch').addEventListener('input', (e) => {
+      gridApi.setGridOption('quickFilterText', e.target.value)
+    })
+
+    // ======================
+    // 9️⃣ Export CSV
+    // ======================
+    document.getElementById('exportExcel').addEventListener('click', () => {
+      gridApi.exportDataAsCsv({
+        fileName: 'tree_data.csv'
+      })
+    })
+
+    // ======================
+    // 🔟 Copy dòng chọn
+    // ======================
+    document.getElementById('copyRow').addEventListener('click', () => {
+      const selected = gridApi.getSelectedRows()
+      if (!selected.length) {
+        alert('⚠️ Chưa chọn dòng nào để copy!')
+        return
+      }
+
+      const text = selected
+        .map(
+          (r) =>
+            `${r.name || ''}\t${r.col1 || ''}\t${r.col2 || ''}\t${r.col3 || ''}`
+        )
+        .join('\n')
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('✅ Đã copy ' + selected.length + ' dòng vào clipboard!')
+      })
+    })
+
+    document.getElementById('copyCellBtn').addEventListener('click', () => {
+      if (selectedCellValue === null) {
+        alert('Chưa chọn ô nào để copy!')
+        return
+      }
+      navigator.clipboard.writeText(selectedCellValue.toString()).then(() => {
+        alert(`Đã copy: ${selectedCellValue}`)
+      })
+    })
   })
 }
 
-function showDescendants(node) {
-  node.children.forEach((child) => {
-    child.row.style.display = 'table-row'
-    if (child.isExpanded) showDescendants(child)
+// Khi DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  tableau.extensions.initializeAsync().then(() => {
+    const worksheet =
+      tableau.extensions.dashboardContent.dashboard.worksheets[0]
+
+    // Load lần đầu
+    loadAndRender(worksheet)
+
+    // Lắng nghe filter và parameter change
+    worksheet.addEventListener(tableau.TableauEventType.FilterChanged, () => {
+      // console.log('vao day roi')
+
+      loadAndRender(worksheet)
+    })
+
+    tableau.extensions.dashboardContent.dashboard
+      .getParametersAsync()
+      .then(function (parameters) {
+        parameters.forEach(function (p) {
+          p.addEventListener(tableau.TableauEventType.ParameterChanged, () => {
+            // console.log('vao day roi 2')
+            loadAndRender(worksheet)
+          })
+        })
+      })
   })
-}
-
-function hideDescendants(node) {
-  node.children.forEach((child) => {
-    child.row.style.display = 'none'
-    hideDescendants(child)
-  })
-}
-
-// Copy selected rows to clipboard with Ctrl+C
-function fallbackCopyText(text) {
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  document.body.appendChild(textarea)
-  textarea.select()
-  try {
-    document.execCommand('copy')
-    console.log('Copied with fallback:\n' + text)
-  } catch (err) {
-    console.error('Fallback copy failed:', err)
-  }
-  document.body.removeChild(textarea)
-}
-
-function copySelectedRows() {
-  let tbody = document.getElementById('tbody')
-  if (!tbody) return
-
-  let rows = Array.from(tbody.querySelectorAll('tr'))
-  let selected = rows.filter((_, idx) => selectedRows.has(idx))
-  if (selected.length === 0) return
-
-  let rowsText = selected.map((tr) => {
-    let cells = Array.from(tr.querySelectorAll('td'))
-    return cells.map((td) => td.textContent.trim()).join('\t')
-  })
-
-  let clipboardText = rowsText.join('\n')
-
-  navigator.clipboard
-    .writeText(clipboardText)
-    .then(() => console.log('Copied:\n' + clipboardText))
-    .catch(() => fallbackCopyText(clipboardText)) // fallback nếu bị chặn
-}
-
-document.addEventListener('keydown', (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
-    event.preventDefault()
-    copySelectedRows()
-  }
 })

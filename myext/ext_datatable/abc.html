@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>DataTable Example</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"
+    />
+    <style>
+      th,
+      td {
+        white-space: nowrap;
+      }
+      thead tr:nth-child(2) th {
+        padding: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Danh sách nhà cung cấp</h3>
+    <input
+      type="text"
+      id="globalSearch"
+      placeholder="Global search..."
+      style="margin-bottom: 10px"
+    />
+
+    <table id="example" class="display nowrap" style="width: 100%">
+      <thead>
+        <tr id="headerRow"></tr>
+        <tr id="filterRow"></tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr id="footerRow"></tr>
+      </tfoot>
+    </table>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+
+    <script>
+      $(document).ready(function () {
+        // Hàm sinh dữ liệu giả lập
+        function generateData(rowCount) {
+          const provinces = ['Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Hải Phòng']
+          const arr = new Array(rowCount)
+          for (let i = 0; i < rowCount; i++) {
+            arr[i] = {
+              id: i + 1,
+              code: 'NCC' + String(i + 1).padStart(5, '0'),
+              name: 'Công ty ' + (i + 1),
+              province: provinces[Math.floor(Math.random() * provinces.length)],
+              orders: Math.floor(Math.random() * 100) + 1,
+              revenue: Math.floor(Math.random() * 10000000) + 100000
+            }
+          }
+          return arr
+        }
+
+        const columnsDef = [
+          { name: 'ID', data: 'id', width: '60px', type: 'number' },
+          { name: 'Mã NCC', data: 'code', width: '120px', type: 'string' },
+          { name: 'Tên NCC', data: 'name', width: '200px', type: 'string' },
+          { name: 'Tỉnh', data: 'province', width: '120px', type: 'string' },
+          {
+            name: 'Số lượng đơn',
+            data: 'orders',
+            width: '100px',
+            type: 'number'
+          },
+          {
+            name: 'Doanh thu (VND)',
+            data: 'revenue',
+            width: '150px',
+            type: 'number'
+          }
+        ]
+
+        const data = generateData(50000)
+
+        // Build header + filter
+        let headerHtml = '',
+          filterHtml = '',
+          footerHtml = ''
+        columnsDef.forEach((col) => {
+          headerHtml += `<th style="width:${col.width}">${col.name}</th>`
+          filterHtml += `<th><select class="colFilter" data-col="${col.data}">
+        <option value="">(All)</option></select></th>`
+          footerHtml += `<th></th>`
+        })
+        $('#headerRow').html(headerHtml)
+        $('#filterRow').html(filterHtml)
+        $('#footerRow').html(footerHtml)
+
+        // Pre-build filter options (append 1 lần thay vì từng option)
+        columnsDef.forEach((col) => {
+          if (col.type === 'string') {
+            const uniqueVals = [...new Set(data.map((d) => d[col.data]))].sort()
+            const options = uniqueVals
+              .map((v) => `<option value="${v}">${v}</option>`)
+              .join('')
+            $(`#filterRow select[data-col="${col.data}"]`).append(options)
+          }
+        })
+
+        const table = $('#example').DataTable({
+          data: data,
+          columns: columnsDef.map((c) => ({ data: c.data })),
+          scrollY: '400px',
+          scrollX: true,
+          paging: false,
+          info: true,
+          dom: 'Bfrtip',
+          buttons: ['excelHtml5'],
+          fixedHeader: true,
+          deferRender: true, // 🚀 chỉ render dòng hiển thị
+          stateSave: true, // lưu trạng thái filter/search
+          footerCallback: function (row, data, start, end, display) {
+            const api = this.api()
+            columnsDef.forEach((col, i) => {
+              if (col.type === 'number') {
+                // Tính tổng nhanh bằng reduce trên array
+                let total = 0
+                const colData = api.column(i, { search: 'applied' }).data()
+                for (let j = 0; j < colData.length; j++) {
+                  total += +colData[j] || 0
+                }
+                $(api.column(i).footer()).html(total.toLocaleString())
+              } else {
+                $(api.column(i).footer()).html('')
+              }
+            })
+          }
+        })
+
+        // Filter event debounce
+        let filterTimeout
+        $('#filterRow select').on('change', function () {
+          clearTimeout(filterTimeout)
+          filterTimeout = setTimeout(() => {
+            let colIdx = $('#filterRow select').index(this)
+            table.column(colIdx).search(this.value, false, false).draw()
+          }, 100)
+        })
+
+        // Global search debounce
+        let searchTimeout
+        $('#globalSearch').on('keyup', function () {
+          clearTimeout(searchTimeout)
+          const value = this.value
+          searchTimeout = setTimeout(() => {
+            table.search(value).draw()
+          }, 300)
+        })
+      })
+    </script>
+  </body>
+</html>

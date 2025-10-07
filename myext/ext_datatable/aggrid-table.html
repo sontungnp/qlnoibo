@@ -75,6 +75,21 @@
         width: 80px;
         padding: 4px;
       }
+      /* cs xem kẽ dòng */
+      .ag-row:nth-child(even) {
+        background-color: #f9f9f9; /* màu cho dòng chẵn */
+      }
+
+      .ag-row:nth-child(odd) {
+        background-color: #ffffff; /* màu cho dòng lẻ */
+      }
+
+      /* them cái này để bôi đen được dòng*/
+      .ag-cell {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+      }
     </style>
   </head>
 
@@ -92,6 +107,7 @@
           />
         </div>
         <button id="exportBtn">Xuất Excel</button>
+        <button id="copyCellBtn">Copy Selected Cell</button>
         <button id="copyBtn">Copy Selected Rows</button>
       </div>
 
@@ -100,6 +116,8 @@
     </div>
 
     <script>
+      let selectedCellValue = null
+
       // ======= 1️⃣ CẤU HÌNH CỘT =======
       const columnDefs = [
         { field: 'id', headerName: 'ID', width: 90 },
@@ -174,11 +192,45 @@
           checkboxes: true
         },
 
-        onRowClicked: (event) => {
+        // sự kiện click vào 1 dòng
+        // onRowClicked: (event) => {
+        //   console.log('row clicked')
+
+        //   // Bỏ chọn tất cả dòng khác
+        //   gridApi.deselectAll()
+        //   // Chọn dòng hiện tại
+        //   event.node.setSelected(true)
+        // },
+
+        // sự kiện click vào 1 cell
+        // onCellClicked: (params) => {
+        //   const text = params.value
+        //   if (text !== undefined && text !== null) {
+        //     navigator.clipboard
+        //       .writeText(text.toString())
+        //       .then(() => {
+        //         console.log(`Copied to clipboard: ${text}`)
+        //       })
+        //       .catch((err) => {
+        //         console.error('Failed to copy:', err)
+        //       })
+        //   }
+
+        //   console.log(
+        //     `Cell clicked: row ${params.rowIndex}, col ${params.colDef.field}, value: ${params.value}`
+        //   )
+        //   params.api.refreshCells({ force: true })
+        // },
+
+        // sự kiện click vào 1 cell
+        onCellClicked: (params) => {
+          selectedCellValue = params.value
+          console.log('Selected cell value:', selectedCellValue)
+
           // Bỏ chọn tất cả dòng khác
           gridApi.deselectAll()
           // Chọn dòng hiện tại
-          event.node.setSelected(true)
+          params.node.setSelected(true)
         },
 
         domLayout: 'normal',
@@ -253,6 +305,16 @@
 
         navigator.clipboard.writeText(text).then(() => {
           alert(`Đã copy ${selectedData.length} dòng vào clipboard!`)
+        })
+      })
+
+      document.getElementById('copyCellBtn').addEventListener('click', () => {
+        if (selectedCellValue === null) {
+          alert('Chưa chọn ô nào để copy!')
+          return
+        }
+        navigator.clipboard.writeText(selectedCellValue.toString()).then(() => {
+          alert(`Đã copy: ${selectedCellValue}`)
         })
       })
     </script>
