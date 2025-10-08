@@ -5,26 +5,49 @@
     <title>AG Grid TreeView - Community Edition</title>
 
     <!-- AG Grid Community -->
-    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
-    <script src="../../lib/tableau.extensions.1.latest.js"></script>
-    <script src="script.js"></script>
+
+    <!-- <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css"
+    />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-quartz.css"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css"
+    /> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.4/dist/ag-grid-community.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.4/styles/ag-theme-quartz.css"
     />
+
+    <script src="../../lib/tableau.extensions.1.latest.js"></script>
+    <script src="script.js"></script>
 
     <style>
       body {
-        margin: 20px;
-        font-family: sans-serif;
+        height: 100%;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f5f6fa;
       }
-      #gridContainer {
-        height: 600px;
-        width: 100%;
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 10px;
       }
       .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 10px;
       }
+      #gridContainer {
+        height: 530px;
+        width: 100%;
+      }
+
       input,
       button {
         padding: 6px 10px;
@@ -61,17 +84,36 @@
         -webkit-user-select: text !important;
         -moz-user-select: text !important;
       }
+      /* css cho expand all và collapse all */
+      #btnExpandAll,
+      #btnCollapseAll {
+        background-color: #e6f4ea;
+        border: 1px solid #b7dfb9;
+      }
+
+      #btnCollapseAll {
+        background-color: #fceaea;
+        border: 1px solid #e2b0b0;
+      }
     </style>
   </head>
   <body>
-    <div class="toolbar">
-      🔍
-      <input type="text" id="globalSearch" placeholder="Tìm kiếm toàn bộ..." />
-      <button id="exportExcel">📤 Export CSV</button>
-      <button id="copyCellBtn">📋 Copy ô được chọn</button>
-      <button id="copyRow">📋 Copy dòng được chọn</button>
-    </div>
+    <div class="container">
+      <div class="toolbar">
+        <button id="btnExpandAll">➕ Mở tất cả</button>
+        <button id="btnCollapseAll">➖ Thu tất cả</button>
+        🔍
+        <input
+          type="text"
+          id="globalSearch"
+          placeholder="Tìm kiếm toàn bộ..."
+        />
+        <button id="exportExcel">📤 Export CSV</button>
+        <button id="copyCellBtn">📋 Copy ô được chọn</button>
+        <button id="copyRow">📋 Copy dòng được chọn</button>
+      </div>
 
-    <div id="gridContainer" class="ag-theme-quartz"></div>
+      <div id="gridContainer" class="ag-theme-quartz"></div>
+    </div>
   </body>
 </html>

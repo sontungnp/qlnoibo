@@ -1,6 +1,17 @@
 'use strict'
 
 let selectedCellValue = null
+let expandListenersBound = false // <-- thêm dòng này
+
+function setAllExpanded(nodes, expanded) {
+  if (!nodes || !nodes.length) return
+  for (const n of nodes) {
+    if (n.children && n.children.length) {
+      n.expanded = expanded
+      setAllExpanded(n.children, expanded)
+    }
+  }
+}
 
 // Hàm chuẩn hóa chỉ để đồng bộ Unicode, không bỏ dấu
 function normalizeUnicode(str) {
@@ -120,7 +131,7 @@ function pivotMeasureValues(
         return {
           headerName: 'Cấu trúc cây',
           field: 'name',
-          flex: 2,
+          width: 300,
           cellRenderer: (params) => {
             const node = params.data
             if (!node) return ''
@@ -182,6 +193,7 @@ function pivotMeasureValues(
 }
 
 let gridApi = null
+let nestedData = []
 
 // Load lại dữ liệu và render
 function loadAndRender(worksheet) {
@@ -213,61 +225,6 @@ function loadAndRender(worksheet) {
     console.log('data', data)
 
     console.log('isMeasure', isMeasure)
-
-    // ======================
-    // 4️⃣ Tree data + Flatten ban đầu
-    // ======================
-    const nestedData = buildTree(data)
-    let flatData = flattenTree(nestedData)
-
-    console.log('data', data)
-    console.log('nestedData', nestedData)
-    console.log('flatData', flatData)
-
-    // ======================
-    // 6️⃣ Cấu hình AG Grid
-    // ======================
-    const gridOptions = {
-      columnDefs,
-      rowData: flatData,
-      defaultColDef: {
-        filter: true,
-        sortable: true,
-        resizable: true
-      },
-      rowSelection: {
-        mode: 'multiRow',
-        checkboxes: true
-      },
-      suppressRowClickSelection: false,
-
-      // sự kiện click vào 1 cell
-      onCellClicked: (params) => {
-        const el = params.event.target
-        if (el.classList.contains('toggle-btn')) {
-          toggleNode(el.dataset.id)
-        } else {
-          selectedCellValue = params.value
-          console.log('Selected cell value:', selectedCellValue)
-          // Bỏ chọn tất cả dòng khác
-          gridApi.deselectAll()
-          // Chọn dòng hiện tại
-          params.node.setSelected(true)
-        }
-      }
-    }
-
-    const eGridDiv = document.getElementById('gridContainer')
-    // const gridApi = agGrid.createGrid(eGridDiv, gridOptions)
-    if (!gridApi) {
-      // ❗ Chỉ tạo grid 1 lần
-      gridApi = agGrid.createGrid(eGridDiv, gridOptions)
-    } else {
-      // ✅ Cập nhật lại dữ liệu
-      gridApi.setGridOption('rowData', data)
-      gridApi.setGridOption('columnDefs', columnDefs)
-      updateFooterTotals()
-    }
 
     // ======================
     // 2️⃣ Hàm tạo dữ liệu tree
@@ -306,16 +263,22 @@ function loadAndRender(worksheet) {
           currentLevel = parent.children
         })
 
-        // Cấp cuối cùng -> thêm dòng dữ liệu leaf
-        parent.children[`leaf_${++idCounter}`] = {
-          id: idCounter,
+        // 3️⃣ Cấp cuối cùng -> thêm dòng dữ liệu leaf (động theo keys)
+        const leafNode = {
+          id: ++idCounter,
           name: null,
           level: treeLevels.length + 1,
-          leaf: true,
-          col1: row.col1,
-          col2: row.col2,
-          col3: row.col3
+          leaf: true
         }
+
+        // ✅ Copy toàn bộ field KHÔNG thuộc tree_lv vào leaf
+        for (const [key, val] of Object.entries(row)) {
+          if (!key.startsWith('tree_lv')) {
+            leafNode[key] = val
+          }
+        }
+
+        parent.children[`leaf_${idCounter}`] = leafNode
       }
 
       return Object.values(rootMap).map((n) => normalizeTree(n))
@@ -345,21 +308,154 @@ function loadAndRender(worksheet) {
     }
 
     // ======================
+    // 4️⃣ Tree data + Flatten ban đầu
+    // ======================
+    nestedData = buildTree(data)
+    let flatData = flattenTree(nestedData)
+
+    console.log('data', data)
+    console.log('nestedData', nestedData)
+    console.log('flatData', flatData)
+
+    // ======= 3️⃣ TÍNH TỔNG =======
+    function calcTotalsTree(nodes, numericCols) {
+      const totals = {}
+      numericCols.forEach((col) => (totals[col] = 0))
+
+      function traverse(nodeList) {
+        for (const node of nodeList) {
+          // Nếu node có children → duyệt tiếp
+          if (node.children && node.children.length > 0) {
+            traverse(node.children)
+          }
+
+          // Nếu node là leaf → cộng giá trị numeric
+          if (node.leaf) {
+            numericCols.forEach((col) => {
+              const val = Number(node[col])
+              if (!isNaN(val)) {
+                totals[col] += val
+              }
+            })
+          }
+        }
+      }
+
+      traverse(nodes)
+      return totals
+    }
+
+    // ======================
+    // 6️⃣ Cấu hình AG Grid
+    // ======================
+    const gridOptions = {
+      columnDefs,
+      rowData: flatData,
+      defaultColDef: {
+        filter: true,
+        sortable: true,
+        resizable: true
+      },
+      rowSelection: {
+        mode: 'multiRow',
+        checkboxes: true
+      },
+      suppressRowClickSelection: false,
+      suppressInjectStyles: true, // ✅ fix bug injection CSS
+
+      // sự kiện click vào 1 cell
+      onCellClicked: (params) => {
+        const el = params.event.target
+        if (el.classList.contains('toggle-btn')) {
+          toggleNode(el.dataset.id)
+        } else {
+          selectedCellValue = params.value
+          console.log('Selected cell value:', selectedCellValue)
+          // Bỏ chọn tất cả dòng khác
+          gridApi.deselectAll()
+          // Chọn dòng hiện tại
+          params.node.setSelected(true)
+        }
+      },
+      onGridReady: () => updateFooterTotals(),
+      onFilterChanged: () => updateFooterTotals(),
+      onSortChanged: () => updateFooterTotals()
+    }
+
+    const eGridDiv = document.querySelector('#gridContainer')
+
+    if (!gridApi) {
+      // ❗ Chỉ tạo grid 1 lần
+      gridApi = agGrid.createGrid(eGridDiv, gridOptions)
+    } else {
+      // ✅ Cập nhật lại dữ liệu
+      gridApi.setGridOption('rowData', flatData)
+      gridApi.setGridOption('columnDefs', columnDefs)
+      updateFooterTotals()
+    }
+
+    // Code mở tất cả và đóng tất cả tree
+    if (!expandListenersBound) {
+      const btnExpand = document.getElementById('btnExpandAll')
+      const btnCollapse = document.getElementById('btnCollapseAll')
+
+      if (btnExpand) {
+        btnExpand.addEventListener('click', () => {
+          // mở toàn bộ cây
+          setAllExpanded(nestedData, true)
+          const flat = flattenTree(nestedData)
+          gridApi.setGridOption('rowData', flat)
+          updateFooterTotals && updateFooterTotals()
+          // nếu muốn scroll tới đầu:
+          // const vp = gridApi.gridBodyCtrl?.eBodyViewport; if (vp) vp.scrollTop = 0
+        })
+      }
+
+      if (btnCollapse) {
+        btnCollapse.addEventListener('click', () => {
+          // đóng toàn bộ cây
+          setAllExpanded(nestedData, false)
+          const flat = flattenTree(nestedData)
+          gridApi.setGridOption('rowData', flat)
+          updateFooterTotals && updateFooterTotals()
+        })
+      }
+
+      expandListenersBound = true
+    }
+
+    console.log('done 3')
+
+    // ======================
     // 7️⃣ Toggle expand/collapse
     // ======================
     function toggleNode(nodeId) {
+      // Tìm node theo ID trong dữ liệu gốc
       function recursiveToggle(nodes) {
         for (const n of nodes) {
           if (n.id == nodeId) {
             n.expanded = !n.expanded
-            break
+            return true
           }
-          if (n.children) recursiveToggle(n.children)
+          if (n.children && recursiveToggle(n.children)) return true
         }
+        return false
       }
+
       recursiveToggle(nestedData)
-      flatData = flattenTree(nestedData)
+
+      const flatData = flattenTree(nestedData)
       gridApi.setGridOption('rowData', flatData)
+
+      // Sau khi render xong, cuộn đến đúng node vừa click
+      requestAnimationFrame(() => {
+        const rowNode = gridApi.getDisplayedRowAtIndex(
+          flatData.findIndex((r) => r.id == nodeId)
+        )
+        if (rowNode) {
+          gridApi.ensureNodeVisible(rowNode, 'middle')
+        }
+      })
     }
 
     // ======================
@@ -367,6 +463,7 @@ function loadAndRender(worksheet) {
     // ======================
     document.getElementById('globalSearch').addEventListener('input', (e) => {
       gridApi.setGridOption('quickFilterText', e.target.value)
+      updateFooterTotals()
     })
 
     // ======================
@@ -377,6 +474,36 @@ function loadAndRender(worksheet) {
         fileName: 'tree_data.csv'
       })
     })
+
+    // ======= 7️⃣ DÒNG TỔNG =======
+    function updateFooterTotals() {
+      const allData = []
+      gridApi.forEachNodeAfterFilterAndSort((node) => allData.push(node.data))
+
+      console.log('allData', allData)
+
+      const numericCols = columnDefs
+        .filter((col) => col.type === 'numericColumn')
+        .map((col) => col.field)
+
+      const totals = calcTotalsTree(allData, numericCols)
+
+      // 🟢 Tạo 1 dòng "tổng cộng"
+      const totalRow = {}
+      columnDefs.forEach((col) => {
+        const field = col.field
+        if (numericCols.includes(field)) {
+          totalRow[field] = totals[field]
+        } else if (field === columnDefs[0].field) {
+          totalRow[field] = 'Tổng cộng'
+        } else {
+          totalRow[field] = ''
+        }
+      })
+
+      // ✅ Gán dòng này thành pinned bottom row
+      gridApi.setGridOption('pinnedBottomRowData', [totalRow])
+    }
 
     // ======================
     // 🔟 Copy dòng chọn
@@ -409,6 +536,8 @@ function loadAndRender(worksheet) {
         alert(`Đã copy: ${selectedCellValue}`)
       })
     })
+
+    // xxx
   })
 }
 
@@ -438,5 +567,27 @@ document.addEventListener('DOMContentLoaded', () => {
           })
         })
       })
+
+    // ✅ Tính toán chiều cao khả dụng của extension
+    function adjustGridHeight() {
+      const container = document.querySelector('.container')
+      const toolbar = document.querySelector('.toolbar')
+      const gridContainer = document.getElementById('gridContainer')
+
+      // Chiều cao toàn bộ extension
+      const totalHeight = window.innerHeight
+
+      // Trừ phần toolbar + padding + margin
+      const toolbarHeight = toolbar.offsetHeight
+      const padding = 20 // tổng trên + dưới
+      const extraSpacing = 10 // khoảng cách phụ nếu có
+
+      const gridHeight = totalHeight - toolbarHeight - padding - extraSpacing
+      gridContainer.style.height = `${gridHeight}px`
+    }
+
+    // Gọi khi load trang và khi resize
+    adjustGridHeight()
+    window.addEventListener('resize', adjustGridHeight)
   })
 })
