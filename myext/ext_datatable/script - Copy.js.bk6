@@ -32,46 +32,18 @@ function pivotMeasureValues(
 
   const cols = table.columns.map((c) => c.fieldName)
   const rows = table.data.map((r) =>
-    r.map((c) => {
-      // console.log('c day', c)
-
-      if (c.nativeValue === 4174000000) {
-        console.log('=========xxx========', c.formattedValue)
-      }
-
-      if (c.nativeValue === null || c.nativeValue === undefined) return ''
-
-      // 🔹 Nếu là kiểu ngày hợp lệ (Date object hoặc chuỗi ngày)
-      if (c.nativeValue instanceof Date) {
-        // Định dạng dd/MM/yyyy có thêm số 0
-        return c.nativeValue.toLocaleDateString('vi-VN', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        })
-      }
-
-      return c.formattedValue
-    })
+    r.map((c) =>
+      c.formattedValue === null || c.formattedValue === undefined
+        ? ''
+        : c.formattedValue
+    )
   )
-
-  // console.log('rows', JSON.stringify(rows))
-
-  // const rows = table.data.map((r) =>
-  //   r.map((c) =>
-  //     c.formattedValue === null || c.formattedValue === undefined
-  //       ? ''
-  //       : c.formattedValue
-  //   )
-  // )
 
   // 🔹 Loại bỏ cột không cần
   const filteredCols = cols.filter((_, i) => !excludeIndexes.includes(i))
   const filteredRows = rows.map((r) =>
     r.filter((_, i) => !excludeIndexes.includes(i))
   )
-
-  // console.log('filteredRows', JSON.stringify(filteredRows))
 
   // 🔹 Xác định vị trí Measure Names / Values
   const measureNameIdx = filteredCols.findIndex((c) =>
@@ -104,8 +76,6 @@ function pivotMeasureValues(
     pivotMap.get(dimKey).measures[mName] = mValue
   })
 
-  console.log('pivotMap', JSON.stringify(Object.fromEntries(pivotMap), null, 2))
-
   const measureNames = Array.from(measureSet)
   const headers = [
     ...dimensionIdxs.map((i) => filteredCols[i]),
@@ -135,8 +105,6 @@ function pivotMeasureValues(
     })
     return row
   })
-
-  // console.log('data1', JSON.stringify(data))
 
   // ⚡ columnDefs khớp field format, có xử lý width và numericColumn
   const columnDefs = headers.map((h, idx) => {
@@ -205,7 +173,7 @@ function loadAndRender(worksheet) {
     // console.log('data', data)
     // console.log('result', result)
 
-    // console.log('isMeasure', isMeasure)
+    console.log('isMeasure', isMeasure)
 
     // ======= 3️⃣ TÍNH TỔNG =======
     function calcTotals(data, numericCols) {
@@ -353,28 +321,6 @@ function loadAndRender(worksheet) {
 
       document.body.removeChild(textarea)
     })
-
-    document
-      .getElementById('clearAllFilterBtn')
-      .addEventListener('click', () => {
-        if (!gridApi) return
-
-        // 🔹 1️⃣ Xoá toàn bộ filter theo cột
-        gridApi.setFilterModel(null)
-        gridApi.onFilterChanged()
-
-        // 🔹 2️⃣ Xoá luôn filter toàn cục (search box)
-        const searchBox = document.getElementById('searchBox')
-        if (searchBox) {
-          searchBox.value = ''
-          gridApi.setGridOption('quickFilterText', '')
-        }
-
-        // 🔹 3️⃣ Cập nhật lại dòng tổng
-        setTimeout(() => {
-          updateFooterTotals()
-        }, 300)
-      })
 
     // --- Copy khi Ctrl + C ---
     // document.addEventListener('keydown', (e) => {

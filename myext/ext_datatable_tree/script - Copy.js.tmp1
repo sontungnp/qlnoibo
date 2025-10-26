@@ -63,23 +63,28 @@ function pivotMeasureValues(
     })
   )
 
+  // 🔹 Loại bỏ cột không cần
+  const filteredCols = cols.filter((_, i) => !excludeIndexes.includes(i))
+  const filteredRows = rows.map((r) =>
+    r.filter((_, i) => !excludeIndexes.includes(i))
+  )
+
   // 🔹 Xác định vị trí Measure Names / Values
-  const measureNameIdx = cols.findIndex((c) =>
+  const measureNameIdx = filteredCols.findIndex((c) =>
     c.toLowerCase().includes('measure names')
   )
-  const measureValueIdx = cols.findIndex((c) =>
+  const measureValueIdx = filteredCols.findIndex((c) =>
     c.toLowerCase().includes('measure values')
   )
 
-  const dimensionIdxs = cols
+  const dimensionIdxs = filteredCols
     .map((c, i) => i)
     .filter((i) => i !== measureNameIdx && i !== measureValueIdx)
 
-  // 🔹 Pivot dữ liệu
   const pivotMap = new Map()
   const measureSet = new Set()
 
-  rows.forEach((r) => {
+  filteredRows.forEach((r) => {
     const dimKey = dimensionIdxs.map((i) => r[i]).join('||')
     const mName = r[measureNameIdx]
     const mValue = r[measureValueIdx]
@@ -95,44 +100,30 @@ function pivotMeasureValues(
     pivotMap.get(dimKey).measures[mName] = mValue
   })
 
-  // console.log('pivotMap', JSON.stringify(Object.fromEntries(pivotMap), null, 2))
-
   const measureNames = Array.from(measureSet)
-  const headers = [...dimensionIdxs.map((i) => cols[i]), ...measureNames]
+  const headers = [
+    ...dimensionIdxs.map((i) => filteredCols[i]),
+    ...measureNames
+  ]
   const isMeasure = [
     ...dimensionIdxs.map(() => false),
     ...measureNames.map(() => true)
   ]
 
-  // 🔹 Loại bỏ các cột có tên bắt đầu bằng "hiden" hoặc "AGG("
-  const headerIndexesToKeep = headers
-    .map((header, index) => ({ header, index }))
-    .filter(({ header }) => {
-      const cleanHeader = header.replace(/\(\s*\d+\s*\)\s*$/, '').trim()
-      return (
-        !cleanHeader.toLowerCase().startsWith('hiden') &&
-        !cleanHeader.startsWith('AGG(')
-      )
-    })
-    .map(({ index }) => index)
+  console.log('header day', headers)
 
-  const filteredHeaders = headerIndexesToKeep.map((index) => headers[index])
-  const filteredIsMeasure = headerIndexesToKeep.map((index) => isMeasure[index])
-
-  // ⚡ Sinh dữ liệu dạng object (key = field format) - chỉ giữ các cột hợp lệ
+  // ⚡ Sinh dữ liệu dạng object (key = field format)
   const data = Array.from(pivotMap.values()).map((entry) => {
     const row = {}
-    filteredHeaders.forEach((h, idx) => {
-      const originalIdx = headerIndexesToKeep[idx]
+    headers.forEach((h, idx) => {
+      // Bỏ phần (width) nếu có
       const cleanHeader = h.replace(/\(\s*\d+\s*\)\s*$/, '').trim()
       const key = formatField(cleanHeader)
 
-      if (originalIdx < dimensionIdxs.length) {
-        // Là dimension
-        row[key] = entry.dims[originalIdx]
+      if (idx < dimensionIdxs.length) {
+        row[key] = entry.dims[idx]
       } else {
-        // Là measure
-        const mName = measureNames[originalIdx - dimensionIdxs.length]
+        const mName = measureNames[idx - dimensionIdxs.length]
         const rawValue = entry.measures[mName] || ''
         const numValue = parseFloat(rawValue.toString().replace(/,/g, ''))
         row[key] = !isNaN(numValue) ? numValue : rawValue
@@ -148,7 +139,7 @@ function pivotMeasureValues(
     const width = widthMatch ? parseInt(widthMatch[1], 10) : 150 // mặc định 150
     const cleanHeader = h.replace(/\(\s*\d+\s*\)\s*$/, '').trim()
     const fieldName = formatField(cleanHeader)
-    // console.log('demTree', demTree)
+    console.log('demTree', demTree)
 
     if (fieldName.startsWith('tree_lv')) {
       if (demTree === 0) {
@@ -170,8 +161,7 @@ function pivotMeasureValues(
               const symbol = node.expanded ? '➖' : '➕'
               return (
                 indent +
-                // `<span class="toggle-btn" data-id="${node.id}">${symbol}</span> 📁 ` +
-                `<span class="toggle-btn" data-id="${node.id}">${symbol}</span> ` +
+                `<span class="toggle-btn" data-id="${node.id}">${symbol}</span> 📁 ` +
                 node.name
               )
             }
@@ -203,8 +193,7 @@ function pivotMeasureValues(
           const num = Number(v)
           if (isNaN(num)) return v
           // 🔹 Format với phân tách hàng nghìn, tối đa 2 chữ số thập phân
-          // return num.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-          return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
+          return num.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
         }
 
         // 🔹 ĐỔI MÀU ĐỎ nếu giá trị âm
@@ -378,10 +367,7 @@ function toggleNode(nodeId) {
 // --- Hàm thực hiện copy ---
 function copySelectedRows() {
   const selectedNodes = []
-  // gridApi.forEachNode((node) => {
-  //   if (node.isSelected()) selectedNodes.push(node)
-  // })
-  gridApi.forEachNodeAfterFilterAndSort((node) => {
+  gridApi.forEachNode((node) => {
     if (node.isSelected()) selectedNodes.push(node)
   })
 
@@ -493,11 +479,11 @@ function loadAndRender(worksheet) {
       excludeCols
     )
 
-    // console.log('headers', headers)
-    // console.log('columnDefs', columnDefs)
-    // console.log('data', data)
+    console.log('headers', headers)
+    console.log('columnDefs', columnDefs)
+    console.log('data', data)
 
-    // console.log('isMeasure', isMeasure)
+    console.log('isMeasure', isMeasure)
 
     // ======= DÒNG TỔNG =======
     function updateFooterTotals() {
@@ -542,9 +528,9 @@ function loadAndRender(worksheet) {
     // ✅ Sau đó mới flatten để render
     let flatData = flattenTree(nestedData)
 
-    // console.log('data', data)
-    // console.log('nestedData', nestedData)
-    // console.log('flatData', flatData)
+    console.log('data', data)
+    console.log('nestedData', nestedData)
+    console.log('flatData', flatData)
 
     // ======================
     // 6️⃣ Cấu hình AG Grid
@@ -608,8 +594,8 @@ function loadAndRender(worksheet) {
         }
       },
       onGridReady: () => updateFooterTotals(),
-      onFilterChanged: () => setTimeout(updateFooterTotals, 500),
-      onSortChanged: () => setTimeout(updateFooterTotals, 500)
+      onFilterChanged: () => updateFooterTotals(),
+      onSortChanged: () => updateFooterTotals()
     }
 
     const eGridDiv = document.querySelector('#gridContainer')
@@ -624,7 +610,7 @@ function loadAndRender(worksheet) {
       // updateFooterTotals()
       setTimeout(() => {
         updateFooterTotals()
-      }, 500)
+      }, 300)
     }
 
     // Code mở tất cả và đóng tất cả tree
@@ -641,7 +627,7 @@ function loadAndRender(worksheet) {
           // updateFooterTotals //&& updateFooterTotals()
           setTimeout(() => {
             updateFooterTotals()
-          }, 500)
+          }, 300)
           // nếu muốn scroll tới đầu:
           // const vp = gridApi.gridBodyCtrl?.eBodyViewport; if (vp) vp.scrollTop = 0
         })
@@ -656,7 +642,7 @@ function loadAndRender(worksheet) {
           // updateFooterTotals && updateFooterTotals()
           setTimeout(() => {
             updateFooterTotals()
-          }, 500)
+          }, 300)
         })
       }
 
@@ -671,7 +657,7 @@ function loadAndRender(worksheet) {
       // updateFooterTotals()
       setTimeout(() => {
         updateFooterTotals()
-      }, 500)
+      }, 300)
     })
 
     document
@@ -693,7 +679,7 @@ function loadAndRender(worksheet) {
         // 🔹 3️⃣ Cập nhật lại dòng tổng
         setTimeout(() => {
           updateFooterTotals()
-        }, 500)
+        }, 300)
       })
   })
 }
@@ -714,6 +700,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function refreshExtractTime() {
       worksheet.getDataSourcesAsync().then((dataSources) => {
         dataSources.forEach((ds) => {
+          // Thông tin metadata của extract (nếu có)
+          console.log('ds', ds)
+
+          console.log('Datasource name:', ds.name)
+          console.log('Extract refresh time:', ds.extractUpdateTime) // có thể null nếu live
+
           if (ds.isExtract) {
             extractRefreshTime = 'Extract Refresh Time: ' + ds.extractUpdateTime
           } else {
@@ -732,68 +724,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAndRender(worksheet)
 
     // ======================
-    // Export CSV -> tree không thò thụt được khi export csv
-    // ======================
-    // document.getElementById('exportExcel').addEventListener('click', () => {
-    //   gridApi.exportDataAsCsv({
-    //     fileName: 'tree_data.csv'
-    //   })
-    // })
-
-    // ======================
-    // Export CSV -> tree thò thụt được khi export csv
+    // Export CSV
     // ======================
     document.getElementById('exportExcel').addEventListener('click', () => {
-      const allRows = []
-      gridApi.forEachNodeAfterFilterAndSort((node) => {
-        allRows.push(node.data)
+      gridApi.exportDataAsCsv({
+        fileName: 'tree_data.csv'
       })
-
-      // 🔹 Lấy pinned bottom rows (ví dụ: dòng tổng cộng)
-      const pinnedRows = gridApi.getPinnedBottomRowCount()
-        ? Array.from(
-            { length: gridApi.getPinnedBottomRowCount() },
-            (_, i) => gridApi.getPinnedBottomRow(i).data
-          )
-        : []
-
-      // 🔹 Gộp lại (dòng tổng ở cuối)
-      const exportRows = [...allRows, ...pinnedRows]
-
-      const displayedCols = gridApi.getColumnDefs().map((c) => c.field)
-      const headers = displayedCols.join(',')
-
-      const csvRows = exportRows.map((row) => {
-        return displayedCols
-          .map((col) => {
-            let val = row[col] ?? ''
-            if (col === 'name' && row.level) {
-              const indent = '  '.repeat(row.level - 1)
-              val = indent + val
-            }
-            // Escape CSV nếu có dấu phẩy, nháy kép hoặc xuống dòng
-            if (typeof val === 'string' && val.match(/[",\n]/)) {
-              val = '"' + val.replace(/"/g, '""') + '"'
-            }
-            return val
-          })
-          .join(',')
-      })
-
-      // ⚡ Thêm BOM UTF-8 để Excel đọc đúng tiếng Việt
-      const bom = '\uFEFF'
-      const csvContent = [headers, ...csvRows].join('\n')
-
-      const blob = new Blob([bom + csvContent], {
-        type: 'text/csv;charset=utf-8;'
-      })
-
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      link.download = 'tree_data.csv'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
     })
 
     // --- Copy bằng nút bấm ---
