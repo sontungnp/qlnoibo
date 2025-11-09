@@ -165,9 +165,6 @@
           <button id="exportBtn" title="Export CSV">📤</button>
           <button id="copyCellBtn" title="Copy selected cell">📋</button>
           <button id="copyBtn" title="Copy selected rows">📄</button>
-          <button id="updateTotal" title="Copy selected rows">
-            UpdateTotal
-          </button>
         </div>
       </div>
 

@@ -206,8 +206,6 @@ function loadAndRender(worksheet) {
       columnDefs,
       rowData: data,
       animateRows: true,
-      // suppressAggFuncInHeader: true,
-      // alwaysShowHorizontalScroll: true,
       defaultColDef: {
         sortable: true,
         filter: true,
@@ -253,57 +251,37 @@ function loadAndRender(worksheet) {
       // },
 
       domLayout: 'normal',
-      onGridReady: (params) => {
-        gridApi = params.api
-        updateFooterTotals()
-      },
-      onFilterChanged: () => {
-        console.log(`[${new Date().toISOString()}] Filter changed`)
-        funcTionWait4ToUpdateTotal(3000)
-      },
-      onSortChanged: () => {
-        funcTionWait4ToUpdateTotal(1000)
-      }
+      onGridReady: () => safeUpdateTotals(gridApi),
+      onFilterChanged: () => safeUpdateTotals(gridApi),
+      onSortChanged: () => safeUpdateTotals(gridApi)
     }
 
     const eGridDiv = document.querySelector('#myGrid')
     // const gridApi = agGrid.createGrid(eGridDiv, gridOptions)
     if (!gridApi) {
+      // ❗ Chỉ tạo grid 1 lần
       gridApi = agGrid.createGrid(eGridDiv, gridOptions)
     } else {
-      // ✅ Cập nhật lại dữ liệu và đảm bảo tổng được tính
+      // ✅ Cập nhật lại dữ liệu
       gridApi.setGridOption('rowData', data)
       gridApi.setGridOption('columnDefs', columnDefs)
-
-      // Đảm bảo tổng được tính lại sau khi set dữ liệu mới
-      funcTionWait4ToUpdateTotal(1000)
+      // updateFooterTotals()
+      safeUpdateTotals(gridApi)
     }
 
     // ======= 5️⃣ TÌM KIẾM =======
     document.getElementById('searchBox').addEventListener('input', function () {
       gridApi.setGridOption('quickFilterText', normalizeUnicode(this.value))
+      // updateFooterTotals()
+      safeUpdateTotals(gridApi)
     })
 
-    function funcTionWait4ToUpdateTotal(secondsamt) {
-      console.log(`[${new Date().toISOString()}] Start waiting 3 seconds...`)
-      setTimeout(() => {
-        console.log(`[${new Date().toISOString()}] hello`)
-        document.getElementById('updateTotal').click() // 👈 tự động kích nút
-        console.log(`[${new Date().toISOString()}] done click updatetotal`)
-      }, secondsamt)
-    }
+    // export cu
 
     // ======= 7️⃣ DÒNG TỔNG =======
     function updateFooterTotals() {
-      if (!gridApi) return
-
       const allData = []
-      gridApi.forEachNodeAfterFilterAndSort((node) => {
-        if (!node.rowPinned) {
-          // Chỉ lấy dòng thường, không lấy dòng pinned
-          allData.push(node.data)
-        }
-      })
+      gridApi.forEachNodeAfterFilterAndSort((node) => allData.push(node.data))
 
       const numericCols = columnDefs
         .filter((col) => col.type === 'numericColumn')
@@ -328,14 +306,15 @@ function loadAndRender(worksheet) {
       gridApi.setGridOption('pinnedBottomRowData', [totalRow])
     }
 
+    function safeUpdateTotals(gridApi, delay = 300) {
+      requestAnimationFrame(() => {
+        setTimeout(() => updateFooterTotals(gridApi), delay)
+      })
+    }
+
     // --- Copy bằng nút bấm ---
     document.getElementById('copyBtn').addEventListener('click', () => {
       copySelectedRows()
-    })
-
-    // --- Copy bằng nút bấm ---
-    document.getElementById('updateTotal').addEventListener('click', () => {
-      updateFooterTotals()
     })
 
     document.getElementById('copyCellBtn').addEventListener('click', () => {
@@ -387,7 +366,7 @@ function loadAndRender(worksheet) {
         }
 
         // 🔹 3️⃣ Cập nhật lại dòng tổng
-        funcTionWait4ToUpdateTotal(300)
+        safeUpdateTotals(gridApi)
       })
 
     // --- Copy khi Ctrl + C ---
